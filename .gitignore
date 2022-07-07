@@ -30,3 +30,20 @@
 *.exe
 *.out
 *.app
+
+# JSON
+JSON/
+
+# Visual studio files
+Project/.vs
+Project/x64
+Project/Project.sln
+Project/Project.vcxproj
+Project/Project.vcxproj.filters
+Project/Project.vcxproj.user
+
+results.json
+MC0_Home.json
+MC0_Simple.json
+Results/
+Backup/
