@@ -1,25 +1,31 @@
 # Exemple de makefile pour un programme cplex en C++
-CFLAGS=-Wall -O
+#CFLAGS=-Wall -O -std=c++11
+CFLAGS=-Wall -O -std=c++11 -ggdb3
 CPPFLAGS=-DNDEBUG -DIL_STD 
 CXX=g++
-OBJ=main.o Model_BB.o Data.o 
-CPLEXLIB=-I/home/ibm/cplex-studio/12.10.0.0/CPLEX_Studio/concert/include -I/home/ibm/cplex-studio/12.10.0.0/CPLEX_Studio/cplex/include 
-JSONLIB=-I/local_1/outer/lamste/Librairies/JSON/include
+OBJ=main.o Model_BB.o Model_BendersCordeau.o CoverageCallback.o Data.o 
+CPLEXLIB=-I/home/ibm/cplex-studio/22.1/CPLEX_Studio/concert/include -I/home/ibm/cplex-studio/22.1/CPLEX_Studio/cplex/include 
 CPLEXLIBFLAGS=-lilocplex -lconcert -lcplex -lpthread -lm -ldl
-JSONLIBFLAGS=-lnlohmann
+
  
 main: $(OBJ)
-	$(CXX) $(CFLAGS) -o solver $(OBJ) $(CPLEXLIB) $(JSONLIB) $(CPLEXLIBFLAGS) $(JSONLIBFLAG)
+	$(CXX) $(CFLAGS) -o solver $(OBJ) $(CPLEXLIB) $(CPLEXLIBFLAGS) 
  
 main.o: main.cpp Model_BB.h Data.h
-	$(CXX) $(CFLAGS) $(CPPFLAGS) -c main.cpp $(CPLEXLIB) $(JSONLIB) $(CPLEXLIBFLAGS) $(JSONLIBFLAG)
+	$(CXX) $(CFLAGS) $(CPPFLAGS) -c main.cpp $(CPLEXLIB) $(CPLEXLIBFLAGS)
 
 Model_BB.o: Model_BB.cpp Data.h
-	$(CXX) $(CFLAGS) $(CPPFLAGS) -c Model_BB.cpp $(CPLEXLIB) $(JSONLIB) $(CPLEXLIBFLAGS) $(JSONLIBFLAG)
+	$(CXX) $(CFLAGS) $(CPPFLAGS) -c Model_BB.cpp $(CPLEXLIB) $(CPLEXLIBFLAGS)
+
+Model_BendersCordeau.o: Model_BendersCordeau.cpp CoverageCallback.h Data.h
+	$(CXX) $(CFLAGS) $(CPPFLAGS) -c Model_BendersCordeau.cpp $(CPLEXLIB) $(CPLEXLIBFLAGS)
+
+CoverageCallback.o: CoverageCallback.cpp Data.h
+	$(CXX) $(CFLAGS) $(CPPFLAGS) -c CoverageCallback.cpp $(CPLEXLIB) $(CPLEXLIBFLAGS)
 
 Data.o: Data.cpp
-	$(CXX) $(CFLAGS) $(CPPFLAGS) -c Data.cpp $(CPLEXLIB) $(JSONLIB) $(CPLEXLIBFLAGS) $(JSONLIBFLAG)
+	$(CXX) $(CFLAGS) $(CPPFLAGS) -c Data.cpp $(CPLEXLIB) $(CPLEXLIBFLAGS) 
 
 
 clean:
-	rm -f solver main.o Model_BB.o Data.o
+	rm -f solver main.o Model_BB.o Data.o Model_BendersCordeau.o CoverageCallback.o

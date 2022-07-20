@@ -3,7 +3,6 @@
 
 void CoverageCallback::invoke(const IloCplex::Callback::Context& context)
 {
-
 	switch (context.getId()) {
 	case (IloCplex::Callback::Context::Id::Candidate): 
 		LazyCutCallback(context);
@@ -12,7 +11,6 @@ void CoverageCallback::invoke(const IloCplex::Callback::Context& context)
 		UserCutCallback(context);
 		break;
 	}
-	
 }
 
 
@@ -33,11 +31,11 @@ void CoverageCallback::LazyCutCallback(const IloCplex::Callback::Context& contex
 	}
 
 	//Calculate I_tilde
-	Int3D I_tilde(env, T);
+	Num3D I_tilde(env, T);
 	for (int t = 0; t < T; t++) {
-		I_tilde[t] = IloArray<IloArray<IloInt>>(env, N);
+		I_tilde[t] = IloArray<IloArray<IloNum>>(env, N);
 		for (int i = 0; i < N; i++) {
-			I_tilde[t][i] = IloArray<IloInt>(env, R[i]);
+			I_tilde[t][i] = IloArray<IloNum>(env, R[i]);
 			for (int r = 0; r < R[i]; r++) {
 				IloInt val = 0;
 
@@ -52,135 +50,10 @@ void CoverageCallback::LazyCutCallback(const IloCplex::Callback::Context& contex
 			}
 		}
 	}
+	x_tilde.end();
 
-	//Generate cuts
-	IloExpr lhs(env);
-	lhs -= theta;
-	IloNum covered = 0;
-	switch (cut_type)
-	{
-	//Single B0 cut
-	case cuts::SingleB0:
-	{
-		for (int t = 0; t < T; t++) {
-			for (int i = 0; i < N; i++) {
-				IloNum weight = (IloNum)data.params["Ni"][t][i] / (IloNum)R[i];
-				for (int r = 0; r < R[i]; r++) {
-					if (data.P[t][i][r] == triplet::Uncoverable) { continue; }
-					else if (data.P[t][i][r] == triplet::Precovered) { covered += weight; }
-					else {
-						if (I_tilde[t][i][r] >= 1) {
-							covered += weight;
-						}
-						else {
-							vector<pair<int, int>> cover = data.cover[t][i][r];
-							for (int jBar = 0; jBar < cover.size(); jBar++) {
-								int j = cover[jBar].first;
-								int k0 = cover[jBar].second;
-								for (int k = k0; k < Mj[j]; k++) {
-									lhs += weight * x[t][j][k];
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-		lhs += covered;
-		break;
-	}
+	AddCuts(context, I_tilde);
 
-	//Single B1 cut
-	case cuts::SingleB1:
-	{
-		for (int t = 0; t < T; t++) {
-			for (int i = 0; i < N; i++) {
-				IloNum weight = (IloNum)data.params["Ni"][t][i] / (IloNum)R[i];
-				for (int r = 0; r < R[i]; r++) {
-					if (data.P[t][i][r] == triplet::Uncoverable) { continue; }
-					else if (data.P[t][i][r] == triplet::Precovered) { covered += weight; }
-					else if (data.P[t][i][r] == triplet::Single) {
-						if (I_tilde[t][i][r] > 1) {
-							covered += weight;
-						}
-						else {
-							int j = data.cover[t][i][r][0].first;
-							int k0 = data.cover[t][i][r][0].second;
-							for (int k = k0; k < Mj[j]; k++) {
-								lhs += weight * x[t][j][k];
-
-							}
-						}
-					}
-					else {
-						if (I_tilde[t][i][r] >= 1) {
-							covered += weight;
-						}
-						else {
-							vector<pair<int, int>> cover = data.cover[t][i][r];
-							for (int jBar = 0; jBar < cover.size(); jBar++) {
-								int j = cover[jBar].first;
-								int k0 = cover[jBar].second;
-								for (int k = k0; k < Mj[j]; k++) {
-									lhs += weight * x[t][j][k];
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-		lhs += covered;
-
-		break;
-	}
-
-	//Single B2 cut
-	case cuts::SingleB2:
-	{
-		for (int t = 0; t < T; t++) {
-			for (int i = 0; i < N; i++) {
-				IloNum weight = (IloNum)data.params["Ni"][t][i] / (IloNum)R[i];
-				for (int r = 0; r < R[i]; r++) {
-					if (data.P[t][i][r] == triplet::Uncoverable) { continue; }
-					else if (data.P[t][i][r] == triplet::Precovered) { covered += weight; }
-					else {
-						if (I_tilde[t][i][r] > 1) {
-							covered += weight;
-						}
-						else {
-							vector<pair<int, int>> cover = data.cover[t][i][r];
-							for (int jBar = 0; jBar < cover.size(); jBar++) {
-								int j = cover[jBar].first;
-								int k0 = cover[jBar].second;
-								for (int k = k0; k < Mj[j]; k++) {
-									lhs += weight * x[t][j][k];
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-		lhs += covered;
-		break;
-	}
-	//Will probably throw an error earlier, but just in case
-	default:
-		cout << "Unrecognised cut type" << endl;
-		throw;
-		break;
-	}
-	
-
-
-
-
-	if (context.getCandidateValue(lhs) < -EPS) {
-		context.rejectCandidate(lhs >= 0);
-	}
-	
-	lhs.end();
 }
 
 void CoverageCallback::UserCutCallback(const IloCplex::Callback::Context& context)
@@ -220,6 +93,15 @@ void CoverageCallback::UserCutCallback(const IloCplex::Callback::Context& contex
 			}
 		}
 	}
+	x_tilde.end();
+
+	AddCuts(context, I_tilde);
+
+}
+
+void CoverageCallback::AddCuts(const IloCplex::Callback::Context& context, const Num3D& I_tilde)
+{
+	IloEnv env = context.getEnv();
 
 	//Generate cuts
 	IloExpr lhs(env);
@@ -227,6 +109,7 @@ void CoverageCallback::UserCutCallback(const IloCplex::Callback::Context& contex
 	IloNum covered = 0;
 	switch (cut_type)
 	{
+	//////////////////////////////////////////////////////////////////////////////////////////
 		//Single B0 cut
 	case cuts::SingleB0:
 	{
@@ -258,6 +141,7 @@ void CoverageCallback::UserCutCallback(const IloCplex::Callback::Context& contex
 		break;
 	}
 
+	//////////////////////////////////////////////////////////////////////////////////////////
 	//Single B1 cut
 	case cuts::SingleB1:
 	{
@@ -303,6 +187,7 @@ void CoverageCallback::UserCutCallback(const IloCplex::Callback::Context& contex
 		break;
 	}
 
+	//////////////////////////////////////////////////////////////////////////////////////////
 	//Single B2 cut
 	case cuts::SingleB2:
 	{
@@ -341,11 +226,19 @@ void CoverageCallback::UserCutCallback(const IloCplex::Callback::Context& contex
 	}
 
 
-	if (context.getRelaxationValue(lhs) < -EPS) {
-		//context.addUserCut(lhs >= 0, IloCplex::UseCutForce, IloFalse);
-		context.addUserCut(lhs>= 0, IloCplex::UseCutPurge, IloFalse);
+	switch (context.getId()) {
+	case (IloCplex::Callback::Context::Id::Candidate):
+		if (context.getCandidateValue(lhs) < -EPS) {
+			context.rejectCandidate(lhs >= 0);
+		}
+		lhs.end();
+		break;
+	case (IloCplex::Callback::Context::Id::Relaxation):
+		if (context.getRelaxationValue(lhs) < -EPS) {
+			//context.addUserCut(lhs >= 0, IloCplex::UseCutForce, IloFalse);
+			context.addUserCut(lhs >= 0, IloCplex::UseCutPurge, IloFalse);
+		}
+		lhs.end();
+		break;
 	}
-
-	lhs.end();
-
 }

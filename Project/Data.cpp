@@ -50,7 +50,7 @@ double Data::SolutionQuality(vector<vector<int>> Sol)
             double weight = (double)params["Ni"][t][i] / (double)R[i];
             double subtotal = 0;
             for (int r = 0; r < R[i]; r++) {
-                bool covered = false;
+                bool covered = home[t][i][r];
                 for (int j = 0; j < M; j++) {
                     for (int k = 0; k < Mj[j]; k++) {
                         if ((Sol[t][j] >= k) && a[t][i][r][j][k]) {
@@ -129,11 +129,7 @@ void Data::create_covering(bool verbose)
                     }
                     a3.push_back(a4);
                 }
-                a2.push_back(a3);
-                
-                      
-
-
+                a2.push_back(a3);    
             }
             a1.push_back(a2);
             home1.push_back(home2); 

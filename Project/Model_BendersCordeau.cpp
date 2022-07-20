@@ -1,5 +1,4 @@
 #include "Model_BendersCordeau.h"
-#include "CoverageCallback.h"
 #define EPS 1.0e-6
 
 ILOSTLBEGIN
@@ -8,15 +7,10 @@ typedef IloArray<IloBoolVarArray> BoolVar2D;
 typedef IloArray<BoolVar2D> BoolVar3D;
 
 
-void Model_BendersCordeau::Solve(vector<vector<int>>* warmstart)
+void Model_BendersCordeau::Solve(cuts cut_type, vector<vector<int>>* warmstart)
 {
-
-	cout << "Creating environment and constants \n";
-
 	time_t start;
 	time(&start);
-
-
 	IloEnv env;
 
 	try {
@@ -28,9 +22,19 @@ void Model_BendersCordeau::Solve(vector<vector<int>>* warmstart)
 		vector<int>& R = data.R;
 
 
-		//Variables
-		cout << "Creating variables \n";
+		//Create model and set parameters
+		IloModel model(env);
+		IloCplex cplex(model);
 
+		cplex.setParam(IloCplex::Param::Threads, 1);
+		cplex.setParam(IloCplex::Param::TimeLimit, 7200);
+		cplex.setParam(IloCplex::Param::Preprocessing::Linear, 0);
+		cplex.setParam(IloCplex::Param::Preprocessing::Reduce, 0);
+		cplex.setParam(IloCplex::Param::Emphasis::Memory, 1);
+		cplex.setParam(IloCplex::Param::MIP::Strategy::File, 2);
+		cplex.setParam(IloCplex::Param::WorkMem, 100000);
+
+		//Create variables
 		BoolVar3D x(env, T);
 		for (int t = 0; t < T; t++) {
 			x[t] = BoolVar2D(env, M);
@@ -39,30 +43,16 @@ void Model_BendersCordeau::Solve(vector<vector<int>>* warmstart)
 			}
 		}
 
-
 		BoolVar2D y(env, T);
 		for (int t = 0; t < T; t++) {
 			y[t] = IloBoolVarArray(env, M);
 		}
 
-
 		IloNumVar theta(env);
 
-		//Create model and set parameters
-		IloModel model(env);
-		IloCplex cplex(model);
-
-		cplex.setParam(IloCplex::Param::Threads, 1);
-		cplex.setParam(IloCplex::Param::Preprocessing::Linear, 0);
-		cplex.setParam(IloCplex::Param::Preprocessing::Reformulations, 0);
 
 		//Constraints
-		cout << "Creating constraints \n";
-
-		//Constraints
-		cout << "Creating constraints \n";
-
-		//Budget, year 0
+		////Budget, year 0
 		IloExpr budget0(env);
 		for (int j = 0; j < M; j++) {
 			IloExpr n_outlets(env);
@@ -76,7 +66,7 @@ void Model_BendersCordeau::Solve(vector<vector<int>>* warmstart)
 		model.add(budget0 <= (int)data.params["B"][0]);
 		budget0.end();
 
-		//Budget, year 1+
+		////Budget, year 1+
 		for (int t = 1; t < T; t++) {
 			IloExpr budget(env);
 			for (int j = 0; j < M; j++) {
@@ -93,7 +83,7 @@ void Model_BendersCordeau::Solve(vector<vector<int>>* warmstart)
 			budget.end();
 		}
 
-		//Can't remove outlets, year 0
+		////Can't remove outlets, year 0
 		for (int j = 0; j < M; j++) {
 			IloExpr KeepX(env);
 			int mj = data.params["Mj"][j];
@@ -104,7 +94,7 @@ void Model_BendersCordeau::Solve(vector<vector<int>>* warmstart)
 			KeepX.end();
 		}
 
-		//Can't remove outlets, year 1+
+		////Can't remove outlets, year 1+
 		for (int t = 1; t < T; t++) {
 			for (int j = 0; j < M; j++) {
 				IloExpr KeepXt1(env);
@@ -119,7 +109,7 @@ void Model_BendersCordeau::Solve(vector<vector<int>>* warmstart)
 			}
 		}
 
-		//Can't close stations, year 0+
+		////Can't close stations, year 0+
 		for (int j = 0; j < M; j++) {
 			model.add(y[0][j] >= (int)data.params["y0"][j]);
 			for (int t = 1; t < T; t++) {
@@ -127,7 +117,7 @@ void Model_BendersCordeau::Solve(vector<vector<int>>* warmstart)
 			}
 		}
 
-		//Pay one-time cost
+		////Pay one-time cost
 		for (int t = 0; t < T; t++) {
 			for (int j = 0; j < M; j++) {
 				IloExpr open(env);
@@ -138,14 +128,14 @@ void Model_BendersCordeau::Solve(vector<vector<int>>* warmstart)
 			}
 		}
 
-		//Force zero-outlet variable into model to prevent crash
+		///Redundant, but prevents crash from unextracted variables
 		for (int t = 0; t < T; t++) {
 			for (int j = 0; j < M; j++) {
 				model.add(x[t][j][0] >= 0);
 			}
 		}
 
-		////Upper bound for theta
+		////Upper bound for theta (ensures bounded problem)
 		IloNum ub = 0;
 		for (int t = 0; t < T; t++) {
 			for (int i = 0; i < N; i++) {
@@ -164,16 +154,12 @@ void Model_BendersCordeau::Solve(vector<vector<int>>* warmstart)
 
 
 		//Link callback
-		cout << "Linking callback" << endl;
-
-
-		CoverageCallback cb(data, x, theta, cuts::SingleB1);
+		CoverageCallback cb(data, x, theta, cut_type);
 		CPXLONG contextmask = IloCplex::Callback::Context::Id::Candidate
 			| IloCplex::Callback::Context::Id::Relaxation;
 		cplex.use(&cb, contextmask);
 
 		//Warmstart
-		cout << "Adding warmstart" << endl;
 		IloNumVarArray startVar(env);
 		IloNumArray startVal(env);
 
@@ -220,12 +206,11 @@ void Model_BendersCordeau::Solve(vector<vector<int>>* warmstart)
 		cplex.addMIPStart(startVar, startVal);
 		startVal.end();
 		startVar.end();
-		
 
 
 		cout << "Model creation time: " << time(NULL) - start << " seconds" << endl;
 
-		cout << "Beginning solving process" << endl;
+		//Solve and get results
 		IloBool solved = cplex.solve();
 		if (solved) {
 			cplex.out() << "Solution status:" << cplex.getCplexStatus() << endl;
@@ -233,6 +218,8 @@ void Model_BendersCordeau::Solve(vector<vector<int>>* warmstart)
 
 			ObjectiveValue = cplex.getObjValue();
 			SolveTime = cplex.getTime();
+			OptimalityGap = cplex.getMIPRelativeGap();
+
 
 			for (int t = 0; t < T; t++) {
 				vector<int> Solution1;
@@ -249,11 +236,18 @@ void Model_BendersCordeau::Solve(vector<vector<int>>* warmstart)
 				Solution.push_back(Solution1);
 			}
 		}
+		else {
+			ObjectiveValue = -1;
+			SolveTime = -1;
+			OptimalityGap = -1;
+		}
 	}
-
 catch (IloException & e) {
 	cout << "Exception: " << e << endl;
-	env.end();
+	ObjectiveValue = -1;
+	SolveTime = -1;
+	OptimalityGap = -1;
 }
+env.end();
 }
 

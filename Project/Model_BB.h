@@ -16,6 +16,7 @@ public:
 
 	float ObjectiveValue;
 	float SolveTime;
+	float OptimalityGap;
 	vector<vector<int>> Solution;
 
 

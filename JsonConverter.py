@@ -4,7 +4,7 @@ import os
 import json
 import pickle
 
-for set in ["Simple"]:
+for set in ["Distance", "HomeCharging", "Price", "LongSpan"]:
     for test in range(20):
         fp = "/local_1/outer/lamste/Data/Precomputed/{}/MaximumCover/MC{}".format(set, test)
         data = pickle.load(open(fp +".pickle", "rb"))
