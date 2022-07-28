@@ -50,10 +50,11 @@ void MulticutCallback::LazyCutCallback(const IloCplex::Callback::Context& contex
 			}
 		}
 	}
-	x_tilde.end();
 
 	AddCuts(context, I_tilde);
-
+	//context.postHeuristicSolution();
+	x_tilde.end();
+	I_tilde.end();
 }
 
 void MulticutCallback::UserCutCallback(const IloCplex::Callback::Context& context)
@@ -93,9 +94,12 @@ void MulticutCallback::UserCutCallback(const IloCplex::Callback::Context& contex
 			}
 		}
 	}
-	x_tilde.end();
+	
 
 	AddCuts(context, I_tilde);
+
+	x_tilde.end();
+	I_tilde.end();
 
 }
 

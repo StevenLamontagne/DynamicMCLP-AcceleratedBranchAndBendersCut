@@ -283,7 +283,18 @@ void Model_Multicut::Solve(multicuts cut_type, vector<vector<int>>* warmstart)
 					for (int i = 0; i < N; i++) {
 						IloNum weight = (IloNum)data.params["Ni"][t][i] / (IloNum)R[i];
 						for (int r = 0; r < R[i]; r++) {
+							if (data.P[t][i][r] == triplet::Uncoverable) { continue; }
 							if (data.P[t][i][r] == triplet::Precovered) { val += weight; }
+							else {
+								bool covered = 0;
+								vector<pair<int, int>> cover = data.cover[t][i][r];
+								for (int jBar = 0; jBar < cover.size(); jBar++) {
+									int j = cover[jBar].first;
+									int k0 = cover[jBar].second;
+									if (sol[t][j] >= k0) { covered = 1; }
+								}
+								if (covered) { val += weight; }
+							}
 						}
 					}
 					startVal.add(val);
@@ -374,7 +385,18 @@ void Model_Multicut::Solve(multicuts cut_type, vector<vector<int>>* warmstart)
 					for (int t = 0; t < T; t++) {
 						IloNum weight = (IloNum)data.params["Ni"][t][i] / (IloNum)R[i];
 						for (int r = 0; r < R[i]; r++) {
+							if (data.P[t][i][r] == triplet::Uncoverable) { continue; }
 							if (data.P[t][i][r] == triplet::Precovered) { val += weight; }
+							else {
+								bool covered = 0;
+								vector<pair<int, int>> cover = data.cover[t][i][r];
+								for (int jBar = 0; jBar < cover.size(); jBar++) {
+									int j = cover[jBar].first;
+									int k0 = cover[jBar].second;
+									if (sol[t][j] >= k0) { covered = 1; }
+								}
+								if (covered) { val += weight; }
+							}
 						}
 					}
 					startVal.add(val);
@@ -460,7 +482,18 @@ void Model_Multicut::Solve(multicuts cut_type, vector<vector<int>>* warmstart)
 						IloNum val = 0;
 						IloNum weight = (IloNum)data.params["Ni"][t][i] / (IloNum)R[i];
 						for (int r = 0; r < R[i]; r++) {
+							if (data.P[t][i][r] == triplet::Uncoverable) { continue; }
 							if (data.P[t][i][r] == triplet::Precovered) { val += weight; }
+							else {
+								bool covered = 0;
+								vector<pair<int, int>> cover = data.cover[t][i][r];
+								for (int jBar = 0; jBar < cover.size(); jBar++) {
+									int j = cover[jBar].first;
+									int k0 = cover[jBar].second;
+									if (sol[t][j] >= k0) { covered = 1; }
+								}
+								if (covered) { val += weight; }
+							}
 						}
 						startVal.add(val);
 					}
@@ -534,3 +567,348 @@ void Model_Multicut::Solve(multicuts cut_type, vector<vector<int>>* warmstart)
 	}
 	env.end();
 }
+
+bool Model_Multicut::GreedyFill(vector<vector<double>>& Sol, vector<double>& Budget, vector<vector<vector<bool>>>& coverage)
+{
+	////Initialise solution and budget
+	//for (int t = 0; t < T; t++) {
+	//	for (int j = 0; j < M; j++) {
+	//		for (int k = 1; k < Mj[j]; k++) {
+	//			if (oldSolution[t][j][k] > EPS) {
+	//				newSolution[t][j] = k - 1 + oldSolution[t][j][k];
+	//				break;
+	//			}
+	//		}
+
+	//		double previous = 0.0;
+	//		if (t == 0) { previous = data.params["x0"][j]; }
+	//		else { previous = newSolution[t-1][j]; }
+
+	//		double diff = newSolution[t][j] - previous;
+	//		if ((diff > EPS) && (previous < 1- EPS)) {
+	//			Budget[t] -= diff * data.params["f"][t][j];
+	//		}
+	//		if (diff > EPS) {
+	//			Budget[t] -= diff * data.params["c"][t][j];
+	//		}
+	//	}
+	//}
+	//if (sum(Budget) < EPS) { return false; }
+
+	//Check if solution is fractional and, if so, attempt to repair it
+
+
+	//Exit unsuccessfully if solution remains fractional
+
+
+	//Otherwise, begin greedy fill
+
+	//vector<vector<vector<double>>> coverage;
+	//double SolutionQuality = 0.0;
+
+	////Initialisation
+	//for (int t = 0; t < T; t++) {
+	//	//Initialise coverage of triplets
+	//	vector<vector<double>> cover1;
+	//	for (int i = 0; i < N; i++) {
+	//		vector<double> cover2;
+	//		double weight = (double)data.params["Ni"][t][i] / (double)R[i];
+	//		for (int r = 0; r < R[i]; r++) {
+	//			bool val = 0;
+	//			switch (data.P[t][i][r])
+	//			{
+	//			case triplet::Uncoverable:
+	//				val = 1; //Set to 1 to skip trying to cover later
+	//				break;
+	//			case triplet::Precovered:
+	//				val = 1;
+	//				SolutionQuality += weight;
+	//				break;
+	//			default:
+	//				break;
+	//			}
+	//			cover2.push_back(val);
+	//		}
+	//		cover1.push_back(cover2);
+	//	}
+	//	coverage.push_back(cover1);
+	//}
+
+	//Initialise vectors for holding information for each station
+	vector<double> StationTotals;
+	vector<double> Costs;
+
+	for (int j = 0; j < data.M; j++) {
+		StationTotals.push_back(0.0);
+		Costs.push_back(0.0);
+	}
+
+	bool foundImprovement;
+	//Greedy optimisation
+	for (int t = 0; t < data.T; t++) {
+		//Start adding outlets
+		do
+		{
+			//Reset values
+			foundImprovement = 0;
+			for (int j = 0; j < data.M; j++) {
+				StationTotals[j] = 0.0;
+				Costs[j] = 0.0;
+			}
+
+			//Check for coverage by adding outlet
+			for (int i = 0; i < data.N; i++) {
+				double weight = (double)data.params["Ni"][t][i] / (double)data.R[i];
+				for (int r = 0; r < data.R[i]; r++) {
+					if (coverage[t][i][r]) { continue; }
+					vector<pair<int, int>> cover = data.cover[t][i][r];
+					for (long unsigned  int jBar = 0; jBar < cover.size(); jBar++) {
+						int j = cover[jBar].first;
+						int k0 = cover[jBar].second;
+						if (Sol[t][j] + 1 >= k0) {
+							StationTotals[j] += weight;
+						}
+					}
+				}
+			}
+
+			//Reset coverage of stations to 0 if can't add new outlet
+			for (int j = 0; j < data.M; j++) {
+				//Maximum number of outlets already placed
+				if (Sol[t][j] >= data.Mj[j] - 1) {
+					StationTotals[j] = 0.0;
+					continue;
+				}
+
+				//Budget insufficient for new outlet
+				Costs[j] += (double) data.params["c"][t][j];
+				if (Sol[t][j] == 0) { Costs[j] += (double) data.params["f"][t][j]; }
+				if (Costs[j] > Budget[t]) {
+					StationTotals[j] = 0.0;
+				}
+				//cout << "Coverage of station " << j << ": " << StationTotals[j] << endl;
+			}
+
+
+			int j_star = argmax(StationTotals);
+			double z_star = StationTotals[j_star];
+			if (z_star > 0) {
+				//Update budget
+				Budget[t] -= Costs[j_star];
+
+				for (int tBar = t; tBar < data.T; tBar++) {
+					//Update solution for current (and all future) years
+					Sol[tBar][j_star] += 1;
+
+					//Update coverage of triplets
+					for (int i = 0; i < data.N; i++) {
+						//double weight = (double)data.params["Ni"][t][i] / (double)R[i];
+						for (int r = 0; r < data.R[i]; r++) {
+							if ((!coverage[tBar][i][r]) && (data.a[tBar][i][r][j_star][Sol[tBar][j_star]])) {
+								coverage[tBar][i][r] = 1;
+
+							}
+						}
+					}
+				}
+				foundImprovement = 1;
+			}
+
+
+		} while (foundImprovement);
+	}
+
+	return false;
+}
+
+
+
+vector<int> Model_Multicut::GetFractional(vector<vector<double>> Sol)
+{
+	vector<int> fracList;
+	for (int j = 0; j < data.M; j++) {
+		bool isFrac = false;
+		for (int t = 0; t < data.T; t++) {
+			double current;
+			double frac = modf(Sol[t][j], &current);
+			if (frac > EPS) { isFrac = true; }
+		}
+		if (isFrac) { fracList.push_back(j); }
+	}
+	return fracList;
+}
+
+
+bool Model_Multicut::GreedyRepair(vector<vector<double>>& Sol, vector<double>& Budget, vector<vector<vector<bool>>>& coverage)
+{
+	vector<int> frac = GetFractional(Sol);
+	if (frac.size() == 0) {
+		//Can skip the greedy fill phase: no improvements are possible
+		if (sum(Budget) < EPS) { return false; }
+		//Repair unnecessary, but greedy fill phase may find improvements
+		else { return true; }
+	}
+
+
+	vector<vector<double>> newSolution = Sol;
+
+	//Refund budget for fractional solutions and set values to 0
+	for (int j : frac) {
+		for (int t = 0; t < data.T; t++) {
+			double previous = 0.0;
+			if (t == 0) { previous = data.params["x0"][j]; }
+			else { previous = Sol[t - 1][j]; }
+
+			double delta = Sol[t][j] - previous;
+			if (previous < 1) { Budget[t] += delta * (double) data.params["f"][t][j] ; }
+			Budget[t] += delta * (double) data.params["c"][t][j] ;
+
+			newSolution[t][j] = 0;
+		}
+		
+	}
+
+	////Initialise coverage of triplets
+	//for (int t = 0; t < data.T; t++) {
+	//	vector<vector<bool>> cover1;
+	//	for (int i = 0; i < data.N; i++) {
+	//		vector<bool> cover2;
+	//		double weight = (double)data.params["Ni"][t][i] / (double)data.R[i];
+	//		for (int r = 0; r < data.R[i]; r++) {
+	//			bool val = 0;
+	//			switch (data.P[t][i][r])
+	//			{
+	//			case triplet::Uncoverable:
+	//				val = 1; //Set to 1 to skip trying to cover later
+	//				break;
+	//			case triplet::Precovered:
+	//				val = 1;
+	//				break;
+	//			default:
+	//				vector<pair<int, int>> cover = data.cover[t][i][r];
+	//				for (int jBar = 0; jBar < cover.size(); jBar++) {
+	//					int j = cover[jBar].first;
+	//					int k0 = cover[jBar].second;
+	//					//NOTE: This uses the value of the original solution, but rounded down. This is deliberate, since we know that
+	//					//the new solution will be guaranteed to have at least these values
+	//					if (Sol[t][j] >= k0) {
+	//						val = 1;
+	//						break;
+	//					}
+	//				}
+	//				break;
+	//			}
+	//			cover2.push_back(val);
+	//		}
+	//		cover1.push_back(cover2);
+	//	}
+	//	coverage.push_back(cover1);
+	//}
+
+
+	for (int t = 0; t < data.T; t++) {
+		//Set all stations to lower bounds, adjust budget
+		for (int j : frac) {
+			double previous = 0.0;
+			if (t == 0) { previous = data.params["x0"][j]; }
+			else { previous = newSolution[t - 1][j]; }
+
+			int lb = max(previous, floor(Sol[t][j]));
+
+			if (lb == previous) { continue; }
+			int delta = lb - previous;
+			if (delta > 0) {
+				if (previous == 0) { Budget[t] -= (double) data.params["f"][t][j]; }
+				Budget[t] -= (double) data.params["c"][t][j] * delta;
+			}
+		}
+
+		//If budget is negative, immediately exit and skip greedy fill
+		if (Budget[t] < EPS) { return false; }
+
+
+		vector<double> StationTotals;
+		vector<double> Costs;
+		for (long unsigned int jBar = 0; jBar < frac.size(); jBar++) {
+			StationTotals.push_back(0.0);
+			Costs.push_back(0.0);
+		}
+
+		bool foundImprovement;
+		do
+		{
+			foundImprovement = false;
+			for (long unsigned int jBar = 0; jBar < frac.size(); jBar++) {
+				StationTotals[jBar] = 0.0;
+				Costs[jBar] = 0.0;
+			}
+
+			
+			//Check for coverage from new stations
+			for (int i = 0; i < data.N; i++) {
+				double weight = (double)data.params["Ni"][t][i] / (double)data.R[i];
+				for (int r = 0; r < data.R[i]; r++) {
+					if (coverage[t][i][r]) { continue; }
+					for (long unsigned int jBar=0; jBar < frac.size();jBar++) {
+						int j = frac[jBar];
+						if (data.a[t][i][r][j][newSolution[t][j] + 1]) {
+							StationTotals[jBar] += weight;
+						}
+					}
+				}
+			}
+
+			//Reset coverage of stations to 0 if can't add new outlet
+			for (long unsigned int jBar = 0; jBar < frac.size(); jBar++) {
+				int j = frac[jBar];
+				//Ceiling of current value reached
+				if (newSolution[t][j] >= ceil(Sol[t][j])) { 
+					StationTotals[jBar] = 0.0;
+					continue;
+				}
+
+				//Budget insufficient for new outlet
+				Costs[jBar] += (double) data.params["c"][t][j];
+				if (newSolution[t][j] == 0) { Costs[jBar] += (double) data.params["f"][t][j]; }
+				if (Costs[jBar] > Budget[t]) {
+					StationTotals[jBar] = 0.0;
+				}
+			}
+
+			int jBar_star = argmax(StationTotals);
+			double zBar_star = StationTotals[jBar_star];
+			if (zBar_star > 0) {
+				int j_star = frac[jBar_star];
+
+				//Update budget
+				Budget[t] -= Costs[jBar_star];
+
+				for (int tBar = t; tBar < data.T; tBar++) {
+					//Update solution for current (and all future) years
+					newSolution[tBar][j_star] += 1;
+
+					//Update coverage of triplets
+					for (int i = 0; i < data.N; i++) {
+						for (int r = 0; r < data.R[i]; r++) {
+							if ((!coverage[tBar][i][r]) && (data.a[tBar][i][r][j_star][newSolution[tBar][j_star]])) {
+								coverage[tBar][i][r] = 1;
+							}
+						}
+					}
+				}
+				foundImprovement = 1;
+
+			}
+
+
+
+		} while (foundImprovement);
+	}
+
+	Sol = newSolution;
+	return true;
+}
+
+
+
+

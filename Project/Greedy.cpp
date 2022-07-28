@@ -26,7 +26,7 @@ void Greedy::Solve()
 		vector<vector<bool>> cover1;
 		for (int i = 0; i < N; i++) {
 			vector<bool> cover2;
-			double weight = (double)data.params["Ni"][t][i] / (double)R[i];
+			//double weight = (double)data.params["Ni"][t][i] / (double)R[i];
 			for (int r = 0; r < R[i]; r++) {
 				bool val = 0;
 				switch (data.P[t][i][r])
@@ -36,9 +36,18 @@ void Greedy::Solve()
 					break;
 				case triplet::Precovered:
 					val = 1;
-					SolutionQuality += weight;
+					//SolutionQuality += weight;
 					break;
 				default:
+					vector<pair<int, int>> cover = data.cover[t][i][r];
+					for (int jBar = 0; jBar < cover.size(); jBar++) {
+						int j = cover[jBar].first;
+						int k0 = cover[jBar].second;
+						if (Solution[t][j] >= k0) {
+							val = 1;
+						}
+					}
+					//if (val) { SolutionQuality += weight; }
 					break;
 				}
 				cover2.push_back(val);
@@ -63,22 +72,22 @@ void Greedy::Solve()
 		cout << "Starting year " << t << endl;
 		bool foundImprovement;
 		
-		//Check for coverage from initial solution/solution from last year
-		for (int i = 0; i < N; i++) {
-			double weight = (double)data.params["Ni"][t][i] / (double)R[i];
-			for (int r = 0; r < R[i]; r++) {
-				if (coverage[t][i][r]) { continue; }
-				vector<pair<int, int>> cover = data.cover[t][i][r];
-				for (int jBar = 0; jBar < cover.size(); jBar++) {
-					int j = cover[jBar].first;
-					int k0 = cover[jBar].second;
-					if (Solution[t][j] >= k0) {
-						coverage[t][i][r] = 1;
-					}
-				}
-				if (coverage[t][i][r]) { SolutionQuality += weight; }
-			}
-		}
+		////Check for coverage from initial solution/solution from last year
+		//for (int i = 0; i < N; i++) {
+		//	double weight = (double)data.params["Ni"][t][i] / (double)R[i];
+		//	for (int r = 0; r < R[i]; r++) {
+		//		if (coverage[t][i][r]) { continue; }
+		//		vector<pair<int, int>> cover = data.cover[t][i][r];
+		//		for (int jBar = 0; jBar < cover.size(); jBar++) {
+		//			int j = cover[jBar].first;
+		//			int k0 = cover[jBar].second;
+		//			if (Solution[t][j] >= k0) {
+		//				coverage[t][i][r] = 1;
+		//			}
+		//		}
+		//		if (coverage[t][i][r]) { SolutionQuality += weight; }
+		//	}
+		//}
 
 		//Start adding outlets
 		do
@@ -91,7 +100,7 @@ void Greedy::Solve()
 				Costs[j] = 0.0;
 			}
 
-			//Check for coverage from new stations
+			//Check for coverage by adding outlet
 			for (int i = 0; i < N; i++) {
 				double weight = (double)data.params["Ni"][t][i] / (double)R[i];
 				for (int r = 0; r < R[i]; r++) {
@@ -110,10 +119,13 @@ void Greedy::Solve()
 			//Reset coverage of stations to 0 if can't add new outlet
 			for (int j = 0; j < M; j++) {
 				//Maximum number of outlets already placed
-				if (Solution[t][j] >= Mj[j] - 1) { StationTotals[j] = 0.0; }
+				if (Solution[t][j] >= Mj[j] - 1) { 
+					StationTotals[j] = 0.0;
+					continue;
+				}
 
 				//Budget insufficient for new outlet
-				Costs[j] += data.params["c"][t][j];;
+				Costs[j] += data.params["c"][t][j];
 				if (Solution[t][j] == 0) { Costs[j] += data.params["f"][t][j]; }
 				if (Costs[j] > Budget[t]) {
 					StationTotals[j] = 0.0;
@@ -127,39 +139,23 @@ void Greedy::Solve()
 			if (z_star > 0) {
 				cout << "Found improvement of amount " << z_star << endl;
 				cout << "Adding outlet at station " << j_star << endl;
-				//Update solution for current (and all future) years
-				for (int tBar = t; tBar < T; tBar++) {
-					Solution[tBar][j_star] += 1;
-				}
-
+				
 				//Update budget
 				Budget[t] -= Costs[j_star];
 
-				//Update solution quality (Solution quality unnecessary?)
-				SolutionQuality += z_star;
+				for (int tBar = t; tBar < T; tBar++) {
+					//Update solution for current (and all future) years
+					Solution[tBar][j_star] += 1;
 
-				//Update coverage of triplets
-				for (int i = 0; i < N; i++) {
-					for (int r = 0; r < R[i]; r++) {
-						if (!coverage[t][i][r]) {
-							//Check for pair directly
-							if (std::find(data.cover[t][i][r].begin(), data.cover[t][i][r].end(), std::make_pair(j_star, Solution[t][j_star])) != data.cover[t][i][r].end()) {
-								coverage[t][i][r] = 1;
+					//Update coverage of triplets
+					for (int i = 0; i < N; i++) {
+						//double weight = (double)data.params["Ni"][t][i] / (double)R[i];
+						for (int r = 0; r < R[i]; r++) {
+							if ((!coverage[tBar][i][r]) && (data.a[tBar][i][r][j_star][Solution[tBar][j_star]])) {
+								coverage[tBar][i][r] = 1;
+								//SolutionQuality += weight;
 							}
-							//else {
-							//	coverable += (double)data.params["Ni"][t][i] / (double)R[i];
-							//}
 						}
-
-						////Check for coverage more manually
-						//vector<pair<int, int>> cover = data.cover[t][i][r];
-						//for (int jBar = 0; jBar < cover.size(); jBar++) {
-						//	int j = cover[jBar].first;
-						//	int k0 = cover[jBar].second;
-						//	if (Solution[t][j] >= k0){
-						//		coverage[t][i][r] = 1;
-						//	}
-						//}
 					}
 				}
 				foundImprovement = 1;	
@@ -171,6 +167,7 @@ void Greedy::Solve()
 		cout << "\n" << endl;
 	}
 	SolveTime = chrono::duration_cast<chrono::duration<double>>(chrono::steady_clock::now() - t1).count();
+	SolutionQuality = data.SolutionQuality(Solution);
 }
 
 

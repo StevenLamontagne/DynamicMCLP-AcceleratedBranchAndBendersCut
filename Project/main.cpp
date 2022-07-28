@@ -69,6 +69,9 @@ int main(int argc, char** argv) {
     time(&start);
     data.load(file, verbose);
     std::cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
+    vector<double> times_warmstart;
+    vector<double> times_nowarmstart;
+
 
     //Greedy mdl;
     //mdl.SetData(data);
@@ -77,52 +80,158 @@ int main(int argc, char** argv) {
     //cout << "Solution value (Data): " << data.SolutionQuality(mdl.Solution) << endl;
     //cout << "Solve time (seconds): " << mdl.SolveTime << endl;
 
-    Model_Multicut mdl2;
-    mdl2.SetData(data);
-    mdl2.Solve(multicuts::Multi1B1);
-    std::cout << "Solution value (Benders): " << mdl2.ObjectiveValue << endl;
-    std::cout << "Solution value (Data): " << data.SolutionQuality(mdl2.Solution) << endl;
-    std::cout << "Solve time (seconds): " << mdl2.SolveTime << endl;
+    //std::cout << "\n" << endl;
+    //std::cout << "\n" << endl;
 
-    std::cout << "\n" << endl;
-    std::cout << "\n" << endl;
 
-    mdl2.Solve(multicuts::Multi1B2);
-    std::cout << "Solution value (Benders): " << mdl2.ObjectiveValue << endl;
-    std::cout << "Solution value (Data): " << data.SolutionQuality(mdl2.Solution) << endl;
-    std::cout << "Solve time (seconds): " << mdl2.SolveTime << endl;
+    //Model_Multicut mdl2;
+    //mdl2.SetData(data);
 
-    std::cout << "\n" << endl;
-    std::cout << "\n" << endl;
+    /*
+    vector<vector<double>> testSol = { {0.0, 0.0, 0.0, 0.4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, \
+                                {0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, \
+                                {0.2, 0.2, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, \
+                                {0.6, 0.5, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0} };
+    */
 
-    mdl2.Solve(multicuts::Multi2B1);
-    std::cout << "Solution value (Benders): " << mdl2.ObjectiveValue << endl;
-    std::cout << "Solution value (Data): " << data.SolutionQuality(mdl2.Solution) << endl;
-    std::cout << "Solve time (seconds): " << mdl2.SolveTime << endl;
+    vector<vector<double>> testSol = { {0.1, 0.1, 0.0, 0.4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, \
+                        {0.1, 0.1, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, \
+                        {0.2, 0.2, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, \
+                        {0.6, 0.5, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0} };
+    vector<double> Budget = data.RemainingBudget(testSol);
+  
+    vector<vector<vector<bool>>> coverage;
+    //Initialise coverage of triplets
+    for (int t = 0; t < data.T; t++) {
+        vector<vector<bool>> cover1;
+        for (int i = 0; i < data.N; i++) {
+            vector<bool> cover2;
+            double weight = (double)data.params["Ni"][t][i] / (double)data.R[i];
+            for (int r = 0; r < data.R[i]; r++) {
+                bool val = 0;
+                switch (data.P[t][i][r])
+                {
+                case triplet::Uncoverable:
+                    val = 1; //Set to 1 to skip trying to cover later
+                    break;
+                case triplet::Precovered:
+                    val = 1;
+                    break;
+                default:
+                    vector<pair<int, int>> cover = data.cover[t][i][r];
+                    for (int jBar = 0; jBar < cover.size(); jBar++) {
+                        int j = cover[jBar].first;
+                        int k0 = cover[jBar].second;
+                        //NOTE: This uses the value of the original solution, but rounded down. This is deliberate, since we know that
+                        //the new solution will be guaranteed to have at least these values
+                        if (testSol[t][j] >= k0) {
+                            val = 1;
+                            break;
+                        }
+                    }
+                    break;
+                }
+                cover2.push_back(val);
+            }
+            cover1.push_back(cover2);
+        }
+        coverage.push_back(cover1);
+    }
 
-    std::cout << "\n" << endl;
-    std::cout << "\n" << endl;
+    mdl2.GreedyRepair(testSol, Budget, coverage);
+    cout << "Repaired solution" << endl;
+    for (int t = 0; t < testSol.size(); t++) {
+        cout << "Year " << t << endl;
+        for (int j = 0; j < testSol[t].size(); j++) {
+            if (testSol[t][j] > 0) {
+                cout << "Station " << j << " :" << testSol[t][j] << endl;
+            }
+        }
+    }
 
-    mdl2.Solve(multicuts::Multi2B2);
-    std::cout << "Solution value (Benders): " << mdl2.ObjectiveValue << endl;
-    std::cout << "Solution value (Data): " << data.SolutionQuality(mdl2.Solution) << endl;
-    std::cout << "Solve time (seconds): " << mdl2.SolveTime << endl;
+    cout << "\n" << endl;
 
-    std::cout << "\n" << endl;
-    std::cout << "\n" << endl;
+    mdl2.GreedyFill(testSol, Budget, coverage);
+    cout << "Filled solution" << endl;
+    for (int t = 0; t < testSol.size(); t++) {
+        cout << "Year " << t << endl;
+        for (int j = 0; j < testSol[t].size(); j++) {
+            if (testSol[t][j] > 0) {
+                cout << "Station " << j << " :" << testSol[t][j] << endl;
+            }
+        }
+    }
 
-    mdl2.Solve(multicuts::Multi3B1);
-    std::cout << "Solution value (Benders): " << mdl2.ObjectiveValue << endl;
-    std::cout << "Solution value (Data): " << data.SolutionQuality(mdl2.Solution) << endl;
-    std::cout << "Solve time (seconds): " << mdl2.SolveTime << endl;
+    //mdl2.Solve(multicuts::Multi1B1, &mdl.Solution);
+    ////std::cout << "Solution value (Benders): " << mdl2.ObjectiveValue << endl;
+    ////std::cout << "Solution value (Data): " << data.SolutionQuality(mdl2.Solution) << endl;
+    ////std::cout << "Solve time (seconds): " << mdl2.SolveTime << endl;
+    //times_warmstart.push_back(mdl2.SolveTime);
+    //mdl2.Solve(multicuts::Multi1B1);
+    //times_nowarmstart.push_back(mdl2.SolveTime);
+    //std::cout << "\n" << endl;
+    //std::cout << "\n" << endl;
 
-    std::cout << "\n" << endl;
-    std::cout << "\n" << endl;
+    //mdl2.Solve(multicuts::Multi1B2, &mdl.Solution);
+    ////std::cout << "Solution value (Benders): " << mdl2.ObjectiveValue << endl;
+    ////std::cout << "Solution value (Data): " << data.SolutionQuality(mdl2.Solution) << endl;
+    ////std::cout << "Solve time (seconds): " << mdl2.SolveTime << endl;
+    //times_warmstart.push_back(mdl2.SolveTime);
+    //mdl2.Solve(multicuts::Multi1B2);
+    //times_nowarmstart.push_back(mdl2.SolveTime);
 
-    mdl2.Solve(multicuts::Multi3B2);
-    std::cout << "Solution value (Benders): " << mdl2.ObjectiveValue << endl;
-    std::cout << "Solution value (Data): " << data.SolutionQuality(mdl2.Solution) << endl;
-    std::cout << "Solve time (seconds): " << mdl2.SolveTime << endl;
+    //std::cout << "\n" << endl;
+    //std::cout << "\n" << endl;
+
+    //mdl2.Solve(multicuts::Multi2B1, &mdl.Solution);
+    ////std::cout << "Solution value (Benders): " << mdl2.ObjectiveValue << endl;
+    ////std::cout << "Solution value (Data): " << data.SolutionQuality(mdl2.Solution) << endl;
+    ////std::cout << "Solve time (seconds): " << mdl2.SolveTime << endl;
+    //times_warmstart.push_back(mdl2.SolveTime);
+    //mdl2.Solve(multicuts::Multi2B1);
+    //times_nowarmstart.push_back(mdl2.SolveTime);
+
+    //std::cout << "\n" << endl;
+    //std::cout << "\n" << endl;
+
+    //mdl2.Solve(multicuts::Multi2B2, &mdl.Solution);
+    ////std::cout << "Solution value (Benders): " << mdl2.ObjectiveValue << endl;
+    ////std::cout << "Solution value (Data): " << data.SolutionQuality(mdl2.Solution) << endl;
+    ////std::cout << "Solve time (seconds): " << mdl2.SolveTime << endl;
+    //times_warmstart.push_back(mdl2.SolveTime);
+    //mdl2.Solve(multicuts::Multi2B2);
+    //times_nowarmstart.push_back(mdl2.SolveTime);
+
+    //std::cout << "\n" << endl;
+    //std::cout << "\n" << endl;
+
+    //mdl2.Solve(multicuts::Multi3B1, &mdl.Solution);
+    ////std::cout << "Solution value (Benders): " << mdl2.ObjectiveValue << endl;
+    ////std::cout << "Solution value (Data): " << data.SolutionQuality(mdl2.Solution) << endl;
+    ////std::cout << "Solve time (seconds): " << mdl2.SolveTime << endl;
+    //times_warmstart.push_back(mdl2.SolveTime);
+    //mdl2.Solve(multicuts::Multi3B1);
+    //times_nowarmstart.push_back(mdl2.SolveTime);
+
+    //std::cout << "\n" << endl;
+    //std::cout << "\n" << endl;
+
+    //mdl2.Solve(multicuts::Multi3B2, &mdl.Solution);
+    ////std::cout << "Solution value (Benders): " << mdl2.ObjectiveValue << endl;
+    ////std::cout << "Solution value (Data): " << data.SolutionQuality(mdl2.Solution) << endl;
+    ////std::cout << "Solve time (seconds): " << mdl2.SolveTime << endl;
+    //times_warmstart.push_back(mdl2.SolveTime);
+    //mdl2.Solve(multicuts::Multi3B2);
+    //times_nowarmstart.push_back(mdl2.SolveTime);
+
+
+    //cout << "With warmstart: [" << endl;
+    //for (auto i : times_warmstart) { cout << i<< ","; }
+    //cout << "]" << endl;
+
+    //cout << "Without warmstart: [" << endl;
+    //for (auto i : times_nowarmstart) { cout << i << ","; }
+    //cout << "]" << endl;
     //Results_times["CutTimes"] = *mdl2.CutTimes;
     //std::ofstream f2(resultspath + "CutTimes.json");
     //f2 << std::setw(3) << Results_times << std::endl;
@@ -135,32 +244,58 @@ int main(int argc, char** argv) {
 
 #ifdef __linux__
     int maxTest = 20;
-    std::string file = "C:\\Users\\dobby\\Desktop\\Git Hub repo\\Charging-Station_Cpp\\MC0.json";
-    vector<std::string> datasets = {"Price", "LongSpan", "HomeCharging", };
+    std::string file;
+    vector<std::string> datasets = {"HomeCharging", "Distance" };
     //vector<std::string> datasets = { "Distance" };
 
 
-    for (int dBar = 0; dBar < datasets.size(); dBar++) {
+    for (long unsigned int dBar = 0; dBar < datasets.size(); dBar++) {
         cout << "Dataset: " << datasets[dBar] << endl;
         std::string resultspath = "/local_1/outer/lamste/Results/TroisRivieres/C++/" + datasets[dBar] + "/";
         std::string basefile = "/local_1/outer/lamste/Data/Precomputed/" + datasets[dBar] + "/MaximumCover/MC%d.json";
         json Results_times;
+        {
+            std::ifstream f(resultspath + "SolveTimes.json", ifstream::in);
+            f >> Results_times;
+            f.close();
+        }
         json Results_objs;
+        {
+            std::ifstream f(resultspath + "ObjectiveValues.json", ifstream::in);
+            f >> Results_objs;
+            f.close();
+        }
         json Results_gaps;
-
-        vector<double> obj_bb;
-        vector<double> time_bb;
-        vector<double> gap_bb;
-
-
-        vector<double> obj_sb1;
-        vector<double> time_sb1;
-        vector<double> gap_sb1;
+        {
+            std::ifstream f(resultspath + "OptimalityGaps.json", ifstream::in);
+            f >> Results_gaps;
+            f.close();
+        }
 
 
-        vector<double> obj_sb2;
-        vector<double> time_sb2;
-        vector<double> gap_sb2;
+        vector<double> obj_m1b1;
+        vector<double> time_m1b1;
+        vector<double> gap_m1b1;
+
+        vector<double> obj_m1b2;
+        vector<double> time_m1b2;
+        vector<double> gap_m1b2;
+
+        vector<double> obj_m2b1;
+        vector<double> time_m2b1;
+        vector<double> gap_m2b1;
+
+        vector<double> obj_m2b2;
+        vector<double> time_m2b2;
+        vector<double> gap_m2b2;
+
+        vector<double> obj_m3b1;
+        vector<double> time_m3b1;
+        vector<double> gap_m3b1;
+
+        vector<double> obj_m3b2;
+        vector<double> time_m3b2;
+        vector<double> gap_m3b2;
 
         for (int test = 0; test < maxTest; test++) {
             cout << "Test: " << test << endl;
@@ -169,42 +304,62 @@ int main(int argc, char** argv) {
             file = string_format(basefile, test);
             data.load(file, verbose);
             cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
-
+            Model_Multicut mdl;
+            mdl.SetData(data);
             {
-                Model_BendersCordeau mdl_sb1;
-                mdl_sb1.SetData(data);
-                mdl_sb1.Solve(cuts::SingleB1);
-                obj_sb1.push_back(mdl_sb1.ObjectiveValue);
-                time_sb1.push_back(mdl_sb1.SolveTime);
-                gap_sb1.push_back(mdl_sb1.OptimalityGap);
-                Results_times["SingleB1"] = time_sb1;
-                Results_objs["SingleB1"] = obj_sb1;
-                Results_gaps["SingleB1"] = gap_sb1;
+                mdl.Solve(multicuts::Multi1B1);
+                obj_m1b1.push_back(mdl.ObjectiveValue);
+                time_m1b1.push_back(mdl.SolveTime);
+                gap_m1b1.push_back(mdl.OptimalityGap);
+                Results_times["Multi1B1"] = time_m1b1;
+                Results_objs["Multi1B1"] = obj_m1b1;
+                Results_gaps["Multi1B1"] = gap_m1b1;
             }
             {
-                Model_BendersCordeau mdl_sb2;
-                mdl_sb2.SetData(data);
-                mdl_sb2.Solve(cuts::SingleB2);
-                obj_sb2.push_back(mdl_sb2.ObjectiveValue);
-                time_sb2.push_back(mdl_sb2.SolveTime);
-                gap_sb2.push_back(mdl_sb2.OptimalityGap);
-                Results_times["SingleB2"] = time_sb2;
-                Results_objs["SingleB2"] = obj_sb2;
-                Results_gaps["SingleB2"] = gap_sb2;
+                mdl.Solve(multicuts::Multi1B2);
+                obj_m1b2.push_back(mdl.ObjectiveValue);
+                time_m1b2.push_back(mdl.SolveTime);
+                gap_m1b2.push_back(mdl.OptimalityGap);
+                Results_times["Multi1B2"] = time_m1b2;
+                Results_objs["Multi1B2"] = obj_m1b2;
+                Results_gaps["Multi1B2"] = gap_m1b2;
             }
-
             {
-                Model_BB mdl_bb;
-                mdl_bb.SetData(data);
-                mdl_bb.Solve();
-                obj_bb.push_back(mdl_bb.ObjectiveValue);
-                time_bb.push_back(mdl_bb.SolveTime);
-                gap_bb.push_back(mdl_bb.OptimalityGap);
-                Results_times["B&B"] = time_bb;
-                Results_objs["B&B"] = obj_bb;
-                Results_gaps["B&B"] = gap_bb;
+                mdl.Solve(multicuts::Multi2B1);
+                obj_m2b1.push_back(mdl.ObjectiveValue);
+                time_m2b1.push_back(mdl.SolveTime);
+                gap_m2b1.push_back(mdl.OptimalityGap);
+                Results_times["Multi2B1"] = time_m2b1;
+                Results_objs["Multi2B1"] = obj_m2b1;
+                Results_gaps["Multi2B1"] = gap_m2b1;
             }
-
+            {
+                mdl.Solve(multicuts::Multi2B2);
+                obj_m2b2.push_back(mdl.ObjectiveValue);
+                time_m2b2.push_back(mdl.SolveTime);
+                gap_m2b2.push_back(mdl.OptimalityGap);
+                Results_times["Multi2B2"] = time_m2b2;
+                Results_objs["Multi2B2"] = obj_m2b2;
+                Results_gaps["Multi2B2"] = gap_m2b2;
+            }
+            {
+                mdl.Solve(multicuts::Multi3B1);
+                obj_m3b1.push_back(mdl.ObjectiveValue);
+                time_m3b1.push_back(mdl.SolveTime);
+                gap_m3b1.push_back(mdl.OptimalityGap);
+                Results_times["Multi3B1"] = time_m3b1;
+                Results_objs["Multi3B1"] = obj_m3b1;
+                Results_gaps["Multi3B1"] = gap_m3b1;
+            }
+            {
+                mdl.Solve(multicuts::Multi3B2);
+                obj_m3b2.push_back(mdl.ObjectiveValue);
+                time_m3b2.push_back(mdl.SolveTime);
+                gap_m3b2.push_back(mdl.OptimalityGap);
+                Results_times["Multi3B2"] = time_m3b2;
+                Results_objs["Multi3B2"] = obj_m3b2;
+                Results_gaps["Multi3B2"] = gap_m3b2;
+            }
             cout << "\n" << endl;
 
             ///Important: reset the writing of the files once memory leak has been found and fixed

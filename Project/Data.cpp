@@ -14,14 +14,14 @@ void Data::load(string i, bool verbose)
     try
     {
         f >> params;
-        T = params["T"];
-        M = params["M"];
-        N = params["N"];
-        for (int r = 0; r < params["R"].size(); r++) {
-            R.push_back(params["R"][r]);
+        T = (int) params["T"];
+        M = (int) params["M"];
+        N = (int) params["N"];
+        for (long unsigned int r = 0; r < params["R"].size(); r++) {
+            R.push_back((int) params["R"][r]);
         }
-        for (int k = 0; k < params["Mj"].size(); k++) {
-            Mj.push_back(params["Mj"][k]);
+        for (long unsigned int k = 0; k < params["Mj"].size(); k++) {
+            Mj.push_back((int) params["Mj"][k]);
         }
 
 
@@ -29,7 +29,12 @@ void Data::load(string i, bool verbose)
             cout << "File loading success \n";
             cout << "Covering creation started \n";
         }
-        create_covering(verbose);
+        try {
+            create_covering(verbose);
+        }
+        catch (exception & e) {
+            cout << "Exception: " << e.what() << endl;
+        }
         if (verbose) {
             cout << "Covering creation successful \n";
         }
@@ -137,9 +142,11 @@ void Data::create_covering(bool verbose)
         a.push_back(a1);
         home.push_back(home1);
     }
+    
 
     //Precompute coverage and type of each triplet
     for (int t = 0; t < T; t++) {
+        cout << "Beginning t = " << t << endl;
         vector<vector<triplet>> P1;
         vector<vector<vector<pair<int, int>>>> cover1;
         for (int i = 0; i < N; i++) {
@@ -155,7 +162,7 @@ void Data::create_covering(bool verbose)
                         }
                     }
                 }
-
+         
                 if (home[t][i][r] == 1) {
                     P2.push_back(triplet::Precovered);
                 }
@@ -165,9 +172,11 @@ void Data::create_covering(bool verbose)
                     {
                     case 0:
                         P2.push_back(triplet::Uncoverable);
+                        //cover3.push_back(make_pair(-1, -1));
                         break;
                     case 1:
                         P2.push_back(triplet::Single);
+                        
                         break;
                     default:
                         P2.push_back(triplet::Multi);
@@ -179,8 +188,12 @@ void Data::create_covering(bool verbose)
             P1.push_back(P2);
             cover1.push_back(cover2);
         }
+        cout << "Completing t = " << t << endl;
         P.push_back(P1);
         cover.push_back(cover1);
+        cout << "cover1 pushed" << endl;
+        cout << "\n" << endl;
     }
+    cout << "Triplet types computed" << endl;
 
 }
