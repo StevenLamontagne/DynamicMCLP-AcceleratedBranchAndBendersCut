@@ -1,27 +1,27 @@
-#include "Data.h"
+#include "Data_Strengthened.h"
 
 
 
 using namespace std;
 
-void Data::load(string i, bool verbose)
-{   
+void Data_Strengthened::load(string i, bool verbose)
+{
     if (verbose) {
         cout << "File loading starting \n";
     }
-	std::ifstream f(i, ifstream::in);
+    std::ifstream f(i, ifstream::in);
 
     try
     {
         f >> params;
-        T = (int) params["T"];
-        M = (int) params["M"];
-        N = (int) params["N"];
+        T = (int)params["T"];
+        M = (int)params["M"];
+        N = (int)params["N"];
         for (long unsigned int r = 0; r < params["R"].size(); r++) {
-            R.push_back((int) params["R"][r]);
+            R.push_back((int)params["R"][r]);
         }
         for (long unsigned int k = 0; k < params["Mj"].size(); k++) {
-            Mj.push_back((int) params["Mj"][k]);
+            Mj.push_back((int)params["Mj"][k]);
         }
 
 
@@ -44,10 +44,10 @@ void Data::load(string i, bool verbose)
         cout << e.what() << '\n';
     }
 
-	f.close();
+    f.close();
 }
 
-double Data::SolutionQuality(vector<vector<int>> Sol)
+double Data_Strengthened::SolutionQuality(vector<vector<int>> Sol)
 {
     double total = 0;
     for (int t = 0; t < T; t++) {
@@ -57,8 +57,8 @@ double Data::SolutionQuality(vector<vector<int>> Sol)
             for (int r = 0; r < R[i]; r++) {
                 bool covered = home[t][i][r];
                 for (int j = 0; j < M; j++) {
-                    for (int k = 0; k < Mj[j]; k++) {
-                        if ((Sol[t][j] >= k) && a[t][i][r][j][k]) {
+                    for (int k = 1; k < Mj[j]; k++) {
+                        if ((Sol[t][j] >= k) && aBar[t][i][r][j][k]) {
                             covered = true;
                             break;
                         }
@@ -76,15 +76,15 @@ double Data::SolutionQuality(vector<vector<int>> Sol)
 }
 
 
-void Data::create_covering(bool verbose)
+void Data_Strengthened::create_covering(bool verbose)
 {
-    a.clear();
+    aBar.clear();
     home.clear();
     P.clear();
     cover.clear();
 
     //Calculate home coverage and station coverage
-    for (int t = 0; t < T;t++) {
+    for (int t = 0; t < T; t++) {
         vector<vector<vector<vector<bool>>>> a1;
         vector<vector<bool>> home1;
         for (int i = 0; i < N; i++) {
@@ -107,6 +107,7 @@ void Data::create_covering(bool verbose)
                 }
                 for (int j = 0; j < M; j++) {
                     vector<bool> a4;
+                    vector<bool> a4Bar;
                     a4.push_back(0);
                     if (params["d1"][t][j][i][r] == nullptr) {
                         for (int k = 1; k < Mj[j]; k++) {
@@ -130,19 +131,25 @@ void Data::create_covering(bool verbose)
                                 }
                             }
 
-                        }            
+                        }
                     }
-                    a3.push_back(a4);
+                    a4Bar.push_back(0);
+                    a4Bar.push_back(a4[1]);
+                    for (int k = 2; k < Mj[j]; k++) {
+                        a4Bar.push_back(a4[k] - a4[k-1]);
+                    }
+
+                    a3.push_back(a4Bar);
                 }
-                a2.push_back(a3);    
+                a2.push_back(a3);
             }
             a1.push_back(a2);
-            home1.push_back(home2); 
+            home1.push_back(home2);
         }
-        a.push_back(a1);
+        aBar.push_back(a1);
         home.push_back(home1);
     }
-    
+
 
     //Precompute coverage and type of each triplet
     for (int t = 0; t < T; t++) {
@@ -155,13 +162,13 @@ void Data::create_covering(bool verbose)
                 vector<pair<int, int>> cover3;
                 for (int j = 0; j < M; j++) {
                     for (int k = 1; k < Mj[j]; k++) {
-                        if (a[t][i][r][j][k] == 1) {
+                        if (aBar[t][i][r][j][k] == 1) {
                             cover3.push_back(make_pair(j, k));
                             break;
                         }
                     }
                 }
-         
+
                 if (home[t][i][r] == 1) {
                     P2.push_back(triplet::Precovered);
                 }
@@ -175,7 +182,7 @@ void Data::create_covering(bool verbose)
                         break;
                     case 1:
                         P2.push_back(triplet::Single);
-                        
+
                         break;
                     default:
                         P2.push_back(triplet::Multi);

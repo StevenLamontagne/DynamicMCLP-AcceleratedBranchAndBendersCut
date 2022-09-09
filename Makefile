@@ -3,11 +3,10 @@
 CFLAGS=-Wall -O -std=c++11 -ggdb3
 CPPFLAGS=-DNDEBUG -DIL_STD 
 CXX=g++
-OBJ=main.o Model_BB.o Model_BendersCordeau.o CoverageCallback.o Model_Multicut.o MulticutCallback.o Data.o 
+OBJ=main.o Model_BB.o Model_BendersCordeau.o CoverageCallback.o Model_Multicut.o MulticutCallback.o Greedy.o Data.o 
 CPLEXLIB=-I/home/ibm/cplex-studio/22.1/CPLEX_Studio/concert/include -I/home/ibm/cplex-studio/22.1/CPLEX_Studio/cplex/include 
 CPLEXLIBFLAGS=-lilocplex -lconcert -lcplex -lpthread -lm -ldl
 
- 
 main: $(OBJ)
 	$(CXX) $(CFLAGS) -o solver $(OBJ) $(CPLEXLIB) $(CPLEXLIBFLAGS) 
  
@@ -23,15 +22,18 @@ Model_BendersCordeau.o: Model_BendersCordeau.cpp CoverageCallback.h Data.h
 CoverageCallback.o: CoverageCallback.cpp Data.h
 	$(CXX) $(CFLAGS) $(CPPFLAGS) -c CoverageCallback.cpp $(CPLEXLIB) $(CPLEXLIBFLAGS)
 
-Model_Multicut.o: Model_Multicut.cpp MulticutCallback.h Data.h
+Model_Multicut.o: Model_Multicut.cpp MulticutCallback.h Greedy.h Data.h
 	$(CXX) $(CFLAGS) $(CPPFLAGS) -c Model_Multicut.cpp $(CPLEXLIB) $(CPLEXLIBFLAGS)
 
 MulticutCallback.o: MulticutCallback.cpp Data.h
 	$(CXX) $(CFLAGS) $(CPPFLAGS) -c MulticutCallback.cpp $(CPLEXLIB) $(CPLEXLIBFLAGS)
+
+Greedy.o: Greedy.cpp Data.h
+	$(CXX) $(CFLAGS) $(CPPFLAGS) -c Greedy.cpp $(CPLEXLIB) $(CPLEXLIBFLAGS)
 
 Data.o: Data.cpp
 	$(CXX) $(CFLAGS) $(CPPFLAGS) -c Data.cpp $(CPLEXLIB) $(CPLEXLIBFLAGS) 
 
 
 clean:
-	rm -f solver main.o Model_BB.o Data.o Model_BendersCordeau.o CoverageCallback.o Model_Multicut.o MulticutCallback.o
+	rm -f solver main.o Model_BB.o Data.o Model_BendersCordeau.o CoverageCallback.o Model_Multicut.o MulticutCallback.o Greedy.o

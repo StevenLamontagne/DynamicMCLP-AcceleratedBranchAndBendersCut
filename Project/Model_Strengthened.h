@@ -4,14 +4,14 @@
 #include <ctime>
 #include <cmath>
 
-#include "Data.h"
-#include "MulticutCallback.h"
-#include "Greedy.h"
+#include "Data_Strengthened.h"
+#include "MulticutCallback_Strengthened.h"
+//#include "Greedy.h"
 
-class Model_Multicut
+class Model_Strengthened
 {
 public:
-	void SetData(const Data& newData) { data = newData; };
+	void SetData(const Data_Strengthened& newData) { data = newData; };
 	void Solve(multicuts cut_type, useHeuristic heuristic, int nGRASP);
 
 	float ObjectiveValue;
@@ -28,7 +28,7 @@ public:
 	bool GRASPCut(IloEnv& env, IloModel& model, BoolVar3D& x, IloArray<IloNumVarArray>& theta);
 
 private:
-	Data data;
+	Data_Strengthened data;
 
 	int argmax(vector<double> vec) {
 		auto maxVal = max_element(vec.begin(), vec.end());
@@ -45,7 +45,7 @@ private:
 
 	vector<int> GetFractional(vector<vector<double>> Sol);
 
-	
+
 
 
 };

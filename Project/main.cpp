@@ -13,6 +13,7 @@
 
 #ifdef __linux__
 #include "json.hpp"
+//#include "jsonOld.hpp"
 #endif
 
 
@@ -20,15 +21,10 @@ using json = nlohmann::json;
 
 #include "Data.h"
 
-#include "Model_BB.h"
-
-//#include "Model_BendersCordeau.h"
-//#include "CoverageCallback.h"
-
 #include "Model_Multicut.h"
 #include "MulticutCallback.h"
 
-//#include "Greedy.h"
+#include "Greedy.h"
 
 
 template<typename ... Args>
@@ -63,105 +59,89 @@ int main(int argc, char** argv) {
 
 #ifdef _WIN32
     std::string resultspath = "C:\\Users\\dobby\\Desktop\\Git Hub repo\\Charging-Station_Cpp\\Results\\";
-    std::string file =  "C:\\Users\\dobby\\Desktop\\Git Hub repo\\Charging-Station_Cpp\\MC1.json";
+    std::string file =  "C:\\Users\\dobby\\Desktop\\Git Hub repo\\Charging-Station_Cpp\\MC0_Home.json";
     
     time_t start;
     time(&start);
-    data.load(file, verbose);
+    data.load(file, false);
     std::cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
-    vector<double> times_warmstart;
-    vector<double> times_nowarmstart;
+    
+    //long int reduction = 0;
+    //long int total = 0;
+    //for (int t = 0; t < data.T; t++) {
+    //    for (int i = 0; i < data.N; i++) {
+    //        for (int r1 = 0; r1 < data.R[i]; r1++) {
+    //            total += 1;
+    //            for (int r2 = data.R[i]-1; r2 > r1; r2--) {
+    //                bool isMatch = true;
+    //                for (int j = 0; j < data.M; j++) {
+    //                    for (int k = 0; k < data.Mj[j]; k++) {
+    //                        if (data.a[t][i][r1][j][k] != data.a[t][i][r2][j][k]) { isMatch = false; break; }
+    //                    }
+    //                    if (!isMatch) { break; }
+    //                }
+    //                if (isMatch) {
+    //                    reduction += 1;
+    //                    break;
+    //                }
+    //            }
+    //        }
+    //    }
+    //}
+    //cout << "Number of scenarios which can be reduced: " << reduction << endl;
+    //cout << "This represets a reduction of " << (double)reduction / (double)total << " %" << endl;
+    //cout << "\n" << endl;
+    
+    //vector<double> times_warmstart;
+    ////vector<double> times_nowarmstart;
+    Model_Multicut mdl;
+    mdl.SetData(data);
+    mdl.Solve(multicuts::Multi1B1, useHeuristic::None, 0);
+    cout << "Solution quality (data, optimal:18091.1):" << data.SolutionQuality(mdl.Solution) << endl;
+    cout << "Total time: " << mdl.TotalTime << endl;
+    cout << "Repair ratio: " << mdl.RepairRatio << endl;
+    cout << "\n \n" << endl;
+
+    //mdl.Solve(multicuts::Multi1B1, useHeuristic::WarmstartAndPostGreedy, 0);
+    //cout << "Solution quality (data, optimal:18091.1):" << data.SolutionQuality(mdl.Solution) << endl;
+    //cout << "Total time: " << mdl.TotalTime << endl;
+    //cout << "Repair ratio: " << mdl.RepairRatio << endl;
+    //cout << "\n \n" << endl;
 
 
-    //Greedy mdl;
-    //mdl.SetData(data);
-    //mdl.Solve();
-    //cout << "Solution value (Greedy): " << mdl.SolutionQuality << endl;
-    //cout << "Solution value (Data): " << data.SolutionQuality(mdl.Solution) << endl;
-    //cout << "Solve time (seconds): " << mdl.SolveTime << endl;
+    //mdl.Solve(multicuts::Multi1SB2, useHeuristic::None, 0);
+    //cout << "Solution quality (data, optimal:18091.1):" << data.SolutionQuality(mdl.Solution) << endl;
+    //cout << "Total time: " << mdl.TotalTime << endl;
+    //cout << "\n \n" << endl;
 
-    //std::cout << "\n" << endl;
-    //std::cout << "\n" << endl;
+    //mdl.Solve(multicuts::Multi1B1, useHeuristic::Warmstart, 50);
+    //cout << "Solution quality (data, optimal:18091.1):" << data.SolutionQuality(mdl.Solution) << endl;
+    //cout << "Total time: " << mdl.TotalTime << endl;
+    //cout << "\n \n" << endl;
 
+    //mdl.Solve(multicuts::Multi1B1, useHeuristic::None, 50);
+    //cout << "Solution quality (data, optimal:18091.1):" << data.SolutionQuality(mdl.Solution) << endl;
+    //cout << "Total time: " << mdl.TotalTime << endl;
+    //cout << "\n \n" << endl;
 
-    //Model_Multicut mdl2;
-    //mdl2.SetData(data);
+    //mdl2.Solve(multicuts::SingleB2);
+    //cout << "Solution quality (data, optimal:18091.1):" << data.SolutionQuality(mdl2.Solution) << endl;
+    //cout << "\n \n" << endl;
 
-    /*
-    vector<vector<double>> testSol = { {0.0, 0.0, 0.0, 0.4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, \
-                                {0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, \
-                                {0.2, 0.2, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, \
-                                {0.6, 0.5, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0} };
-    */
+    //mdl2.Solve(multicuts::Multi1B1, useHeuristic::None);
+    //cout << "Solution quality (data, optimal:18091.1):" << data.SolutionQuality(mdl2.Solution) << endl;
+    //cout << "\n \n" << endl;
 
-    vector<vector<double>> testSol = { {0.1, 0.1, 0.0, 0.4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, \
-                        {0.1, 0.1, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, \
-                        {0.2, 0.2, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, \
-                        {0.6, 0.5, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0} };
-    vector<double> Budget = data.RemainingBudget(testSol);
-  
-    vector<vector<vector<bool>>> coverage;
-    //Initialise coverage of triplets
-    for (int t = 0; t < data.T; t++) {
-        vector<vector<bool>> cover1;
-        for (int i = 0; i < data.N; i++) {
-            vector<bool> cover2;
-            double weight = (double)data.params["Ni"][t][i] / (double)data.R[i];
-            for (int r = 0; r < data.R[i]; r++) {
-                bool val = 0;
-                switch (data.P[t][i][r])
-                {
-                case triplet::Uncoverable:
-                    val = 1; //Set to 1 to skip trying to cover later
-                    break;
-                case triplet::Precovered:
-                    val = 1;
-                    break;
-                default:
-                    vector<pair<int, int>> cover = data.cover[t][i][r];
-                    for (int jBar = 0; jBar < cover.size(); jBar++) {
-                        int j = cover[jBar].first;
-                        int k0 = cover[jBar].second;
-                        //NOTE: This uses the value of the original solution, but rounded down. This is deliberate, since we know that
-                        //the new solution will be guaranteed to have at least these values
-                        if (testSol[t][j] >= k0) {
-                            val = 1;
-                            break;
-                        }
-                    }
-                    break;
-                }
-                cover2.push_back(val);
-            }
-            cover1.push_back(cover2);
-        }
-        coverage.push_back(cover1);
-    }
+    //mdl2.Solve(multicuts::Multi1B1, useHeuristic::Warmstart);
+    //cout << "Solution quality (data, optimal:18091.1):" << data.SolutionQuality(mdl2.Solution) << endl;
+    //cout << "\n \n" << endl;
 
-    mdl2.GreedyRepair(testSol, Budget, coverage);
-    cout << "Repaired solution" << endl;
-    for (int t = 0; t < testSol.size(); t++) {
-        cout << "Year " << t << endl;
-        for (int j = 0; j < testSol[t].size(); j++) {
-            if (testSol[t][j] > 0) {
-                cout << "Station " << j << " :" << testSol[t][j] << endl;
-            }
-        }
-    }
-
-    cout << "\n" << endl;
-
-    mdl2.GreedyFill(testSol, Budget, coverage);
-    cout << "Filled solution" << endl;
-    for (int t = 0; t < testSol.size(); t++) {
-        cout << "Year " << t << endl;
-        for (int j = 0; j < testSol[t].size(); j++) {
-            if (testSol[t][j] > 0) {
-                cout << "Station " << j << " :" << testSol[t][j] << endl;
-            }
-        }
-    }
-
+    //mdl2.Solve(multicuts::Multi1B1, useHeuristic::WarmstartAndPost);
+    //cout << "Solution quality (data, optimal:18091.1):" << data.SolutionQuality(mdl2.Solution) << endl;
+    //cout << "\n \n" << endl;
+    //mdl2.Solve(multicuts::Multi3B2);
+    //cout << "Solution quality (data, optimal:18091.1):" << data.SolutionQuality(mdl2.Solution) << endl;
+    //cout << "\n \n" << endl;
     //mdl2.Solve(multicuts::Multi1B1, &mdl.Solution);
     ////std::cout << "Solution value (Benders): " << mdl2.ObjectiveValue << endl;
     ////std::cout << "Solution value (Data): " << data.SolutionQuality(mdl2.Solution) << endl;
@@ -245,57 +225,132 @@ int main(int argc, char** argv) {
 #ifdef __linux__
     int maxTest = 20;
     std::string file;
-    vector<std::string> datasets = {"HomeCharging", "Distance" };
-    //vector<std::string> datasets = { "Distance" };
+    //vector<std::string> datasets = {"HomeCharging"};
+    vector<std::string> datasets = { "Price", "LongSpan" };
+    //vector<std::string> datasets = {"Simple"};
 
+    //for (auto dataset : datasets) {
+    //    cout << "Dataset: " << dataset << endl;
+    //    std::string basefile = "/local_1/outer/lamste/Data/Precomputed/" + dataset + "/MaximumCover/MC%d.json";
 
-    for (long unsigned int dBar = 0; dBar < datasets.size(); dBar++) {
-        cout << "Dataset: " << datasets[dBar] << endl;
-        std::string resultspath = "/local_1/outer/lamste/Results/TroisRivieres/C++/" + datasets[dBar] + "/";
-        std::string basefile = "/local_1/outer/lamste/Data/Precomputed/" + datasets[dBar] + "/MaximumCover/MC%d.json";
+    //    long int reduction_total = 0;
+    //    long int max_total = 0;
+    //    long int uncoverable_total = 0;
+    //    long int precovered_total = 0;
+    //    for (int test = 0; test < maxTest; test++) {
+    //        long int reduction_test = 0;
+    //        long int max_test = 0;
+    //        long int uncoverable_test = 0;
+    //        long int precovered_test = 0;
+    //        file = string_format(basefile, test);
+    //        data.load(file, false);
+    //        for (int t = 0; t < data.T; t++) {
+    //            for (int i = 0; i < data.N; i++) {
+    //                for (int r1 = 0; r1 < data.R[i]; r1++) {
+    //                    max_total += 1;
+    //                    max_test += 1;
+    //                    if (data.P[t][i][r1] == triplet::Uncoverable) {
+    //                        uncoverable_test += 1;
+    //                        uncoverable_total += 1;
+    //                        break;
+    //                    }
+    //                    else if (data.P[t][i][r1] == triplet::Precovered) {
+    //                        precovered_test += 1;
+    //                        precovered_total += 1;
+    //                        break;
+    //                    }
+    //                    else {
+    //                        for (int r2 = data.R[i] - 1; r2 > r1; r2--) {
+    //                            bool isMatch = true;
+    //                            for (int j = 0; j < data.M; j++) {
+    //                                for (int k = 0; k < data.Mj[j]; k++) {
+    //                                    if (data.a[t][i][r1][j][k] != data.a[t][i][r2][j][k]) { isMatch = false; break; }
+    //                                }
+    //                                if (!isMatch) { break; }
+    //                            }
+    //                            if (isMatch) {
+    //                                reduction_total += 1;
+    //                                reduction_test += 1;
+    //                                break;
+    //                            }
+    //                        }
+    //                    }
+    //                }
+    //            }
+    //        }
+    //        cout << "Test " << test << ": " << endl;
+    //        cout << "Clustering: " << 100 * (double)reduction_test / (double)max_test << " %" << endl;
+    //        cout << "Uncoverable: " << 100 * (double)uncoverable_test / (double)max_test << " %" << endl;
+    //        cout << "Precovered: " << 100 * (double)precovered_test / (double)max_test << " %" << endl;
+
+    //    }
+    //    cout << "Dataset average: " << endl;
+    //    cout << "Clustering: " << 100 * (double)reduction_total / (double)max_total << " %" << endl;
+    //    cout << "Uncoverable: " << 100 * (double)uncoverable_total / (double)max_total << " %" << endl;
+    //    cout << "Precovered: " << 100 * (double)precovered_total / (double)max_total << " %" << endl;
+    //    cout << "\n" << endl;
+    //}
+
+    for (auto dataset : datasets) {
+        cout << "Dataset: " << dataset << endl;
+        std::string resultspath = "/local_1/outer/lamste/Results/TroisRivieres/C++/" + dataset + "/";
+        std::string fp_times = resultspath + "Final_SolveTimes.json";
+        std::string fp_gaps = resultspath + "Final_OptimalityGaps.json";
+        std::string fp_objs = resultspath + "Final_ObjectiveValues.json";
+
+        std::string basefile = "/local_1/outer/lamste/Data/Precomputed/" + dataset + "/MaximumCover/MC%d.json";
         json Results_times;
-        {
-            std::ifstream f(resultspath + "SolveTimes.json", ifstream::in);
-            f >> Results_times;
-            f.close();
-        }
+        //{
+        //    std::ifstream f(fp_times, ifstream::in);
+        //    f >> Results_times;
+        //    f.close();
+        //}
         json Results_objs;
-        {
-            std::ifstream f(resultspath + "ObjectiveValues.json", ifstream::in);
-            f >> Results_objs;
-            f.close();
-        }
+        //{
+        //    std::ifstream f(fp_objs, ifstream::in);
+        //    f >> Results_objs;
+        //    f.close();
+        //}
         json Results_gaps;
-        {
-            std::ifstream f(resultspath + "OptimalityGaps.json", ifstream::in);
-            f >> Results_gaps;
-            f.close();
-        }
+        //{
+        //    std::ifstream f(fp_gaps, ifstream::in);
+        //    f >> Results_gaps;
+        //    f.close();
+        //}
+        vector<double> obj_a;
+        vector<double> time_a;
+        vector<double> gap_a;
+
+        vector<double> obj_b;
+        vector<double> time_b;
+        vector<double> gap_b;
+
+        vector<double> obj_c;
+        vector<double> time_c;
+        vector<double> gap_c;
+
+        vector<double> obj_d;
+        vector<double> time_d;
+        vector<double> gap_d;
 
 
-        vector<double> obj_m1b1;
-        vector<double> time_m1b1;
-        vector<double> gap_m1b1;
 
-        vector<double> obj_m1b2;
-        vector<double> time_m1b2;
-        vector<double> gap_m1b2;
+        //vector<double> obj_m3b2_10;
+        //vector<double> time_m3b2_10;
+        //vector<double> gap_m3b2_10;
 
-        vector<double> obj_m2b1;
-        vector<double> time_m2b1;
-        vector<double> gap_m2b1;
+        //vector<double> obj_m3b2_50;
+        //vector<double> time_m3b2_50;
+        //vector<double> gap_m3b2_50;
 
-        vector<double> obj_m2b2;
-        vector<double> time_m2b2;
-        vector<double> gap_m2b2;
+        //vector<double> obj_m3b2_ws10;
+        //vector<double> time_m3b2_ws10;
+        //vector<double> gap_m3b2_ws10;
 
-        vector<double> obj_m3b1;
-        vector<double> time_m3b1;
-        vector<double> gap_m3b1;
+        //vector<double> obj_m3b2_ws50;
+        //vector<double> time_m3b2_ws50;
+        //vector<double> gap_m3b2_ws50;
 
-        vector<double> obj_m3b2;
-        vector<double> time_m3b2;
-        vector<double> gap_m3b2;
 
         for (int test = 0; test < maxTest; test++) {
             cout << "Test: " << test << endl;
@@ -304,76 +359,103 @@ int main(int argc, char** argv) {
             file = string_format(basefile, test);
             data.load(file, verbose);
             cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
-            Model_Multicut mdl;
-            mdl.SetData(data);
             {
-                mdl.Solve(multicuts::Multi1B1);
-                obj_m1b1.push_back(mdl.ObjectiveValue);
-                time_m1b1.push_back(mdl.SolveTime);
-                gap_m1b1.push_back(mdl.OptimalityGap);
-                Results_times["Multi1B1"] = time_m1b1;
-                Results_objs["Multi1B1"] = obj_m1b1;
-                Results_gaps["Multi1B1"] = gap_m1b1;
+                Model_Multicut mdl;
+                mdl.SetData(data);
+                mdl.Solve(multicuts::Multi1B1, useHeuristic::None, 0);
+                obj_a.push_back(mdl.ObjectiveValue);
+                time_a.push_back(mdl.SolveTime);
+                gap_a.push_back(mdl.OptimalityGap);
+                Results_times["Multi1B1"] = time_a;
+                Results_objs["Multi1B1"] = obj_a;
+                Results_gaps["Multi1B1"] = gap_a;
             }
             {
-                mdl.Solve(multicuts::Multi1B2);
-                obj_m1b2.push_back(mdl.ObjectiveValue);
-                time_m1b2.push_back(mdl.SolveTime);
-                gap_m1b2.push_back(mdl.OptimalityGap);
-                Results_times["Multi1B2"] = time_m1b2;
-                Results_objs["Multi1B2"] = obj_m1b2;
-                Results_gaps["Multi1B2"] = gap_m1b2;
+                Model_Multicut mdl;
+                mdl.SetData(data);
+                mdl.Solve(multicuts::Multi1B1, useHeuristic::Warmstart, 0);
+                obj_b.push_back(mdl.ObjectiveValue);
+                time_b.push_back(mdl.SolveTime);
+                gap_b.push_back(mdl.OptimalityGap);
+                Results_times["Multi1B1_Warmstart"] = time_b;
+                Results_objs["Multi1B1_Warmstart"] = obj_b;
+                Results_gaps["Multi1B1_Warmstart"] = gap_b;
             }
             {
-                mdl.Solve(multicuts::Multi2B1);
-                obj_m2b1.push_back(mdl.ObjectiveValue);
-                time_m2b1.push_back(mdl.SolveTime);
-                gap_m2b1.push_back(mdl.OptimalityGap);
-                Results_times["Multi2B1"] = time_m2b1;
-                Results_objs["Multi2B1"] = obj_m2b1;
-                Results_gaps["Multi2B1"] = gap_m2b1;
+                Model_Multicut mdl;
+                mdl.SetData(data);
+                mdl.Solve(multicuts::Multi3B2, useHeuristic::None, 0);
+                obj_c.push_back(mdl.ObjectiveValue);
+                time_c.push_back(mdl.SolveTime);
+                gap_c.push_back(mdl.OptimalityGap);
+                Results_times["Multi3B2"] = time_c;
+                Results_objs["Multi3B2"] = obj_c;
+                Results_gaps["Multi3B2"] = gap_c;
             }
             {
-                mdl.Solve(multicuts::Multi2B2);
-                obj_m2b2.push_back(mdl.ObjectiveValue);
-                time_m2b2.push_back(mdl.SolveTime);
-                gap_m2b2.push_back(mdl.OptimalityGap);
-                Results_times["Multi2B2"] = time_m2b2;
-                Results_objs["Multi2B2"] = obj_m2b2;
-                Results_gaps["Multi2B2"] = gap_m2b2;
+                Model_Multicut mdl;
+                mdl.SetData(data);
+                mdl.Solve(multicuts::Multi3B2, useHeuristic::Warmstart, 0);
+                obj_d.push_back(mdl.ObjectiveValue);
+                time_d.push_back(mdl.SolveTime);
+                gap_d.push_back(mdl.OptimalityGap);
+                Results_times["Multi3B2_Warmstart"] = time_d;
+                Results_objs["Multi3B2_Warmstart"] = obj_d;
+                Results_gaps["Multi3B2_Warmstart"] = gap_d;
             }
-            {
-                mdl.Solve(multicuts::Multi3B1);
-                obj_m3b1.push_back(mdl.ObjectiveValue);
-                time_m3b1.push_back(mdl.SolveTime);
-                gap_m3b1.push_back(mdl.OptimalityGap);
-                Results_times["Multi3B1"] = time_m3b1;
-                Results_objs["Multi3B1"] = obj_m3b1;
-                Results_gaps["Multi3B1"] = gap_m3b1;
-            }
-            {
-                mdl.Solve(multicuts::Multi3B2);
-                obj_m3b2.push_back(mdl.ObjectiveValue);
-                time_m3b2.push_back(mdl.SolveTime);
-                gap_m3b2.push_back(mdl.OptimalityGap);
-                Results_times["Multi3B2"] = time_m3b2;
-                Results_objs["Multi3B2"] = obj_m3b2;
-                Results_gaps["Multi3B2"] = gap_m3b2;
-            }
+
+            //{
+            //    mdl.Solve(multicuts::Multi3B2, useHeuristic::None, 10);
+            //    obj_m3b2_10.push_back(mdl.ObjectiveValue);
+            //    time_m3b2_10.push_back(mdl.SolveTime);
+            //    gap_m3b2_10.push_back(mdl.OptimalityGap);
+            //    Results_times["Multi3B2_GRASP10"] = time_m3b2_10;
+            //    Results_objs["Multi3B2_GRASP10"] = obj_m3b2_10;
+            //    Results_gaps["Multi3B2_GRASP10"] = gap_m3b2_10;
+            //}
+            //{
+            //    mdl.Solve(multicuts::Multi3B2, useHeuristic::None, 50);
+            //    obj_m3b2_50.push_back(mdl.ObjectiveValue);
+            //    time_m3b2_50.push_back(mdl.SolveTime);
+            //    gap_m3b2_50.push_back(mdl.OptimalityGap);
+            //    Results_times["Multi3B2_GRASP50"] = time_m3b2_50;
+            //    Results_objs["Multi3B2_GRASP50"] = obj_m3b2_50;
+            //    Results_gaps["Multi3B2_GRASP50"] = gap_m3b2_50;
+            //}
+            //{
+            //mdl.Solve(multicuts::Multi3B2, useHeuristic::Warmstart, 10);
+            //obj_m3b2_ws10.push_back(mdl.ObjectiveValue);
+            //time_m3b2_ws10.push_back(mdl.SolveTime);
+            //gap_m3b2_ws10.push_back(mdl.OptimalityGap);
+            //Results_times["Multi3B2_WS_GRASP10"] = time_m3b2_ws10;
+            //Results_objs["Multi3B2_WS_GRASP10"] = obj_m3b2_ws10;
+            //Results_gaps["Multi3B2_WS_GRASP10"] = gap_m3b2_ws10;
+            //}
+            //{
+            //    mdl.Solve(multicuts::Multi3B2, useHeuristic::Warmstart, 50);
+            //    obj_m3b2_ws50.push_back(mdl.ObjectiveValue);
+            //    time_m3b2_ws50.push_back(mdl.SolveTime);
+            //    gap_m3b2_ws50.push_back(mdl.OptimalityGap);
+            //    Results_times["Multi3B2_WS_GRASP50"] = time_m3b2_ws50;
+            //    Results_objs["Multi3B2_WS_GRASP50"] = obj_m3b2_ws50;
+            //    Results_gaps["Multi3B2_WS_GRASP50"] = gap_m3b2_ws50;
+            //}
+
             cout << "\n" << endl;
 
-            ///Important: reset the writing of the files once memory leak has been found and fixed
-            std::ofstream f1(resultspath + "ObjectiveValues.json");
-            f1 << std::setw(3) << Results_objs << std::endl;
-            f1.close();
-            std::ofstream f2(resultspath + "SolveTimes.json");
-            f2 << std::setw(3) << Results_times << std::endl;
-            f2.close();
-            std::ofstream f3(resultspath + "OptimalityGaps.json");
-            f3 << std::setw(3) << Results_gaps << std::endl;
-            f3.close();
+            {
+                std::ofstream f1(fp_times);
+                f1 << std::setw(3) << Results_times << std::endl;
+                f1.close();
+                std::ofstream f2(fp_objs);
+                f2 << std::setw(3) << Results_objs << std::endl;
+                f2.close();
+                std::ofstream f3(fp_gaps);
+                f3 << std::setw(3) << Results_gaps << std::endl;
+                f3.close();
+            }
         }
-        }
+    }
 #endif
 
 	return 0;

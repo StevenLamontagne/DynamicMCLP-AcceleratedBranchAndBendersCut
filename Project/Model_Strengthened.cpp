@@ -1,4 +1,4 @@
-#include "Model_Multicut.h"
+#include "Model_Strengthened.h"
 #define EPS 1.0e-6
 
 ILOSTLBEGIN
@@ -8,7 +8,7 @@ typedef IloArray<IloBoolVarArray> BoolVar2D;
 typedef IloArray<BoolVar2D> BoolVar3D;
 
 
-void Model_Multicut::Solve(multicuts cut_type, useHeuristic heuristic, int nGRASP)
+void Model_Strengthened::Solve(multicuts cut_type, useHeuristic heuristic, int nGRASP)
 {
 	multicut = cut_type;
 	time_t start;
@@ -30,11 +30,12 @@ void Model_Multicut::Solve(multicuts cut_type, useHeuristic heuristic, int nGRAS
 
 		cplex.setParam(IloCplex::Param::Threads, 1);
 		cplex.setParam(IloCplex::Param::TimeLimit, 7200);
-		cplex.setParam(IloCplex::Param::Preprocessing::Linear, 0);
+		cplex.setParam(IloCplex::Param::Preprocessing::Linear , 0);
 		cplex.setParam(IloCplex::Param::Preprocessing::Reduce, 0);
 		cplex.setParam(IloCplex::Param::Emphasis::Memory, 1);
 		cplex.setParam(IloCplex::Param::MIP::Strategy::File, 2);
 		cplex.setParam(IloCplex::Param::WorkMem, 100000);
+		//cplex.setParam(IloCplex::Param::MIP::Strategy::HeuristicFreq, -1);
 
 		//Create variables
 		BoolVar3D x(env, T);
@@ -42,6 +43,14 @@ void Model_Multicut::Solve(multicuts cut_type, useHeuristic heuristic, int nGRAS
 			x[t] = BoolVar2D(env, M);
 			for (int j = 0; j < M; j++) {
 				x[t][j] = IloBoolVarArray(env, Mj[j]);
+			}
+		}
+
+		BoolVar3D z(env, T);
+		for (int t = 0; t < T; t++) {
+			z[t] = BoolVar2D(env, M);
+			for (int j = 0; j < M; j++) {
+				z[t][j] = IloBoolVarArray(env, Mj[j]);
 			}
 		}
 
@@ -57,6 +66,8 @@ void Model_Multicut::Solve(multicuts cut_type, useHeuristic heuristic, int nGRAS
 
 
 		//Constraints
+		cout << "Adding constraints" << endl;
+
 		////Budget, year 0
 		IloExpr budget0(env);
 		for (int j = 0; j < M; j++) {
@@ -130,26 +141,70 @@ void Model_Multicut::Solve(multicuts cut_type, useHeuristic heuristic, int nGRAS
 					open += x[t][j][k];
 				}
 				model.add(open == y[t][j]);
+				open.end();
 			}
 		}
 
-		//////Pay one-time cost
-		//for (int t = 0; t < T; t++) {
-		//	for (int j = 0; j < M; j++) {
-		//		IloExpr open(env);
-		//		for (int k = 1; k < Mj[j]; k++) {
-		//			open += k*x[t][j][k];
-		//		}
-		//		model.add(open >= y[t][j]);
-		//	}
-		//}
+
+		//// Set z
+		for (int t = 0; t < T; t++) {
+			for (int j = 0; j < M; j++) {
+				////Set based on higher values
+				//for (int k = 1; k < Mj[j]; k++) {
+				//	IloExpr temp(env);
+				//	for (int k1 = k; k1 < Mj[j]; k1++) {
+				//		temp += x[t][j][k1];
+				//	}
+				//	model.add(z[t][j][k] == temp);
+				//	temp.end();
+
+				//	model.add(z[t][j][k] <= z[t][j][1]); //Redudant in theory, but prevents the solver from trying shenanigans for the budget
+				//}
+
+				////Set based on number of outlets
+				//IloExpr temp(env);
+				//for (int k = 1; k < Mj[j]; k++) {
+				//	temp += k * x[t][j][k];
+				//}
+
+				//for (int k = 1; k < Mj[j]; k++) {
+				//	model.add(k*z[t][j][k] <= temp);
+				//	model.add(z[t][j][k] <= z[t][j][1]); //Redudant in theory, but prevents the solver from trying shenanigans for the budget
+				//}
+				//temp.end();
+
+
+				////Set based on number of outlets (better)
+				for (int k = 1; k < Mj[j]; k++) {
+					IloExpr temp(env);
+					for (int kBar = k; kBar < Mj[j]; kBar++) {
+						temp += kBar * x[t][j][kBar];
+					}
+					model.add(k*z[t][j][k] <= temp);
+					model.add(z[t][j][k] <= z[t][j][1]); //Redudant in theory, but prevents the solver from trying shenanigans for the budget
+					temp.end();
+				}
+			}
+		}
+
+		////Pay one-time cost
+		for (int t = 0; t < T; t++) {
+			for (int j = 0; j < M; j++) {
+				model.add(z[t][j][1] <= y[t][j]);
+			}
+		}
 
 		///Redundant, but prevents crash from unextracted variables
 		for (int t = 0; t < T; t++) {
+			for (int i = 0; i < N; i++) {
+				model.add(theta[t][i] >= 0);
+			}
 			for (int j = 0; j < M; j++) {
+				model.add(y[t][j] >= 0);
 				for (int k = 0; k < Mj[j]; k++) {
 					model.add(x[t][j][k] >= 0);
-				}		
+					model.add(z[t][j][k] >= 0);
+				}
 			}
 		}
 
@@ -167,7 +222,7 @@ void Model_Multicut::Solve(multicuts cut_type, useHeuristic heuristic, int nGRAS
 		//}
 
 
-		
+
 
 
 		//Cut specific constraints and objective
@@ -175,76 +230,19 @@ void Model_Multicut::Solve(multicuts cut_type, useHeuristic heuristic, int nGRAS
 		IloNumVarArray startVar(env);
 		IloNumArray startVal(env);
 		vector<vector<int>> sol;
-
-		if (heuristic == useHeuristic::Warmstart || heuristic == useHeuristic::WarmstartAndPostSimple || heuristic == useHeuristic::WarmstartAndPostGreedy) {
-			{Greedy G;
-			G.SetData(data);
-			G.Solve();
-			sol = G.Solution;
-			}
-		}
-		else {
-			for (int t = 0; t < T; t++) {
+		for (int t = 0; t < T; t++) {
 				vector<int> sol1;
 				for (int j = 0; j < M; j++) {
 					sol1.push_back(0);
 				}
 				sol.push_back(sol1);
-			}
 		}
+
 		/////////////////////////////////////////////////////////////////////////
 		switch (cut_type)
 		{
-			///////////////////////////////////////////////////////////
-		case multicuts::SingleB1:
-		case multicuts::SingleB2:
-		{
-			////Upper bound for theta (ensures bounded problem)
-			IloNum ub = 0;
-			for (int t = 0; t < T; t++) {
-				for (int i = 0; i < N; i++) {
-					ub += (IloInt)data.params["Ni"][t][i];
-				}
-			}
-			model.add(theta[0][0] <= ub);
-
-
-			//Objective
-			cout << "Adding objective \n";
-			IloExpr obj(env);
-			obj += theta[0][0];
-			model.add(IloMaximize(env, obj));
-			obj.end();
-
-			for (int t = 0; t < T; t++) {
-				for (int j = 0; j < M; j++) {
-					startVar.add(y[t][j]);
-					int val = 0;
-					if (sol[t][j] > 0) { val = 1; }
-					startVal.add(val);
-					for (int k = 0; k < Mj[j]; k++) {
-						int val = 0;
-						if (sol[t][j] == k) {
-							val = 1;
-						}
-						startVar.add(x[t][j][k]);
-						startVal.add(val);
-					}
-				}
-			}
-			startVar.add(theta[0][0]);
-			startVal.add(data.SolutionQuality(sol));
-
-			cplex.addMIPStart(startVar, startVal);
-			startVal.end();
-			startVar.end();
-
-			break;
-		}
-			///////////////////////////////////////////////////////////
-			///////////////////////////////////////////////////////////
-		case multicuts::Multi1SB1:
-		case multicuts::Multi1SB2:
+		///////////////////////////////////////////////////////////
+		///////////////////////////////////////////////////////////
 		case multicuts::Multi1B1:
 		case multicuts::Multi1B2:
 		{
@@ -263,7 +261,9 @@ void Model_Multicut::Solve(multicuts cut_type, useHeuristic heuristic, int nGRAS
 			//Objective
 			cout << "Adding objective \n";
 			IloExpr obj(env);
-			for (int t = 0; t < T; t++) { obj += theta[t][0]; }
+			for (int t = 0; t < T; t++) { 
+				obj += theta[t][0]; 
+			}
 			model.add(IloMaximize(env, obj));
 			obj.end();
 
@@ -282,7 +282,18 @@ void Model_Multicut::Solve(multicuts cut_type, useHeuristic heuristic, int nGRAS
 						startVar.add(x[t][j][k]);
 						startVal.add(val);
 					}
+
+					IloNum outlets = 0.0;
+					for (int k = 0; k < Mj[j]; k++) {
+						startVar.add(z[t][j][k]);
+						if (sol[t][j] >= k) { startVal.add(1); }
+						else { startVal.add(0); }
+
+					}
 				}
+
+
+
 				startVar.add(theta[t][0]);
 				IloNum val = 0;
 				for (int i = 0; i < N; i++) {
@@ -312,83 +323,8 @@ void Model_Multicut::Solve(multicuts cut_type, useHeuristic heuristic, int nGRAS
 
 			break;
 		}
-			///////////////////////////////////////////////////////////
-			///////////////////////////////////////////////////////////
-		case multicuts::Multi2B1:
-		case multicuts::Multi2B2:
-		{
-			////Upper bound for theta (ensures bounded problem)
-
-			
-				
-			for (int i = 0; i < N; i++) {
-				IloNum ub = 0;
-				for (int t = 0; t < T; t++) {
-					ub += (IloInt)data.params["Ni"][t][i];
-				}
-				model.add(theta[0][i] <= ub);
-			}
-				
-
-
-
-			//Objective
-			cout << "Adding objective \n";
-			IloExpr obj(env);
-			for (int i = 0; i < N; i++) { obj += theta[0][i]; }
-			model.add(IloMaximize(env, obj));
-			obj.end();
-
-			//Warmstart
-			for (int t = 0; t < T; t++) {
-				for (int j = 0; j < M; j++) {
-					startVar.add(y[t][j]);
-					int val = 0;
-					if (sol[t][j] > 0) { val = 1; }
-					startVal.add(val);
-					for (int k = 0; k < Mj[j]; k++) {
-						int val = 0;
-						if (sol[t][j] == k) {
-							val = 1;
-						}
-						startVar.add(x[t][j][k]);
-						startVal.add(val);
-					}
-				}
-
-			}
-			for (int i = 0; i < N; i++) {
-				startVar.add(theta[0][i]);
-				IloNum val = 0;
-				for (int t = 0; t < T; t++) {
-					IloNum weight = (IloNum)data.params["Ni"][t][i] / (IloNum)R[i];
-					for (int r = 0; r < R[i]; r++) {
-						if (data.P[t][i][r] == triplet::Uncoverable) { continue; }
-						if (data.P[t][i][r] == triplet::Precovered) { val += weight; }
-						else {
-							bool covered = 0;
-							vector<pair<int, int>> cover = data.cover[t][i][r];
-							for (long unsigned int jBar = 0; jBar < cover.size(); jBar++) {
-								int j = cover[jBar].first;
-								int k0 = cover[jBar].second;
-								if (sol[t][j] >= k0) { covered = 1; }
-							}
-							if (covered) { val += weight; }
-						}
-					}
-				}
-				startVal.add(val);
-			}
-
-
-			cplex.addMIPStart(startVar, startVal);
-			startVal.end();
-			startVar.end();
-
-			break;
-		}
-			///////////////////////////////////////////////////////////
-			///////////////////////////////////////////////////////////
+		///////////////////////////////////////////////////////////
+		///////////////////////////////////////////////////////////
 		case multicuts::Multi3B1:
 		case multicuts::Multi3B2:
 		{
@@ -405,7 +341,7 @@ void Model_Multicut::Solve(multicuts cut_type, useHeuristic heuristic, int nGRAS
 			//Objective
 			cout << "Adding objective \n";
 			IloExpr obj(env);
-			for (int t = 0; t < T; t++) { 
+			for (int t = 0; t < T; t++) {
 				for (int i = 0; i < N; i++) {
 					obj += theta[t][i];
 				}
@@ -463,26 +399,11 @@ void Model_Multicut::Solve(multicuts cut_type, useHeuristic heuristic, int nGRAS
 			break;
 		}
 		}
-		/////////////////////////////////////////////////////////////////////////
-		if (nGRASP > 0) {
-			cout << "Adding GRASP cuts" << endl;
-			int success = 0;
-			int failure = 0;
-			for (int temp = 0; temp < nGRASP; temp++) {
-				bool s = GRASPCut(env, model, x, theta);
-				if (s) { success += 1; }
-				else {
-					failure += 1;
-					if (failure >= success + 10) { break; }
-				}
-			}
-
-		}
 
 		/////////////////////////////////////////////////////////////////////////
 
 		//Link callback
-		MulticutCallback cb(data, x, y, theta, cut_type, heuristic);
+		MulticutCallback_Strengthened cb(data, z, y, theta, cut_type, heuristic);
 		CPXLONG contextmask = IloCplex::Callback::Context::Id::Candidate
 			| IloCplex::Callback::Context::Id::Relaxation;
 		cplex.use(&cb, contextmask);
@@ -539,7 +460,7 @@ void Model_Multicut::Solve(multicuts cut_type, useHeuristic heuristic, int nGRAS
 	env.end();
 }
 
-bool Model_Multicut::GreedyFill(vector<vector<double>>& Sol, vector<double>& Budget, vector<vector<vector<bool>>>& coverage)
+bool Model_Strengthened::GreedyFill(vector<vector<double>>& Sol, vector<double>& Budget, vector<vector<vector<bool>>>& coverage)
 {
 	////Initialise solution and budget
 	//for (int t = 0; t < T; t++) {
@@ -633,7 +554,7 @@ bool Model_Multicut::GreedyFill(vector<vector<double>>& Sol, vector<double>& Bud
 				for (int r = 0; r < data.R[i]; r++) {
 					if (coverage[t][i][r]) { continue; }
 					vector<pair<int, int>> cover = data.cover[t][i][r];
-					for (long unsigned  int jBar = 0; jBar < cover.size(); jBar++) {
+					for (long unsigned int jBar = 0; jBar < cover.size(); jBar++) {
 						int j = cover[jBar].first;
 						int k0 = cover[jBar].second;
 						if (Sol[t][j] + 1 >= k0) {
@@ -652,8 +573,8 @@ bool Model_Multicut::GreedyFill(vector<vector<double>>& Sol, vector<double>& Bud
 				}
 
 				//Budget insufficient for new outlet
-				Costs[j] += (double) data.params["c"][t][j];
-				if (Sol[t][j] == 0) { Costs[j] += (double) data.params["f"][t][j]; }
+				Costs[j] += (double)data.params["c"][t][j];
+				if (Sol[t][j] == 0) { Costs[j] += (double)data.params["f"][t][j]; }
 				if (Costs[j] > Budget[t]) {
 					StationTotals[j] = 0.0;
 				}
@@ -675,7 +596,7 @@ bool Model_Multicut::GreedyFill(vector<vector<double>>& Sol, vector<double>& Bud
 					for (int i = 0; i < data.N; i++) {
 						//double weight = (double)data.params["Ni"][t][i] / (double)R[i];
 						for (int r = 0; r < data.R[i]; r++) {
-							if ((!coverage[tBar][i][r]) && (data.a[tBar][i][r][j_star][Sol[tBar][j_star]])) {
+							if ((!coverage[tBar][i][r]) && (data.aBar[tBar][i][r][j_star][Sol[tBar][j_star]])) {
 								coverage[tBar][i][r] = 1;
 
 							}
@@ -694,7 +615,7 @@ bool Model_Multicut::GreedyFill(vector<vector<double>>& Sol, vector<double>& Bud
 
 
 
-vector<int> Model_Multicut::GetFractional(vector<vector<double>> Sol)
+vector<int> Model_Strengthened::GetFractional(vector<vector<double>> Sol)
 {
 	vector<int> fracList;
 	for (int j = 0; j < data.M; j++) {
@@ -709,7 +630,7 @@ vector<int> Model_Multicut::GetFractional(vector<vector<double>> Sol)
 	return fracList;
 }
 
-bool Model_Multicut::GRASPCut(IloEnv& env, IloModel& model, BoolVar3D& x, IloArray<IloNumVarArray>& theta)
+bool Model_Strengthened::GRASPCut(IloEnv& env, IloModel& model, BoolVar3D& x, IloArray<IloNumVarArray>& theta)
 {
 	//Initialising baseline information
 	vector<double> Budget = data.params["B"];
@@ -757,7 +678,7 @@ bool Model_Multicut::GRASPCut(IloEnv& env, IloModel& model, BoolVar3D& x, IloArr
 			for (int i = 0; i < data.N; i++) {
 				double weight = (double)data.params["Ni"][t][i] / (double)data.R[i];
 				for (int r = 0; r < data.R[i]; r++) {
-					if (I_tilde[t][i][r] >=1) { continue; }
+					if (I_tilde[t][i][r] >= 1) { continue; }
 					vector<pair<int, int>> cover = data.cover[t][i][r];
 					for (long unsigned int jBar = 0; jBar < cover.size(); jBar++) {
 						int j = cover[jBar].first;
@@ -790,7 +711,7 @@ bool Model_Multicut::GRASPCut(IloEnv& env, IloModel& model, BoolVar3D& x, IloArr
 				double threshold = 0.85 * maxVal;
 				vector<int> candidates;
 				for (int j = 0; j < data.M; j++) {
-					if (StationTotals[j] >= threshold) { candidates.push_back(j);  }
+					if (StationTotals[j] >= threshold) { candidates.push_back(j); }
 				}
 				int randIndex = rand() % candidates.size();
 				int j_star = candidates[randIndex];
@@ -806,7 +727,7 @@ bool Model_Multicut::GRASPCut(IloEnv& env, IloModel& model, BoolVar3D& x, IloArr
 					for (int i = 0; i < data.N; i++) {
 						for (int r = 0; r < data.R[i]; r++) {
 							//We cap the I_tilde at 2, since all values > 1 will result in the same contribution for cuts
-							if ( (I_tilde[tBar][i][r] <=1) && (data.a[tBar][i][r][j_star][Sol[tBar][j_star]])) {
+							if ((I_tilde[tBar][i][r] <= 1) && (data.aBar[tBar][i][r][j_star][Sol[tBar][j_star]])) {
 								I_tilde[tBar][i][r] += 1;
 							}
 						}
@@ -1166,7 +1087,7 @@ bool Model_Multicut::GRASPCut(IloEnv& env, IloModel& model, BoolVar3D& x, IloArr
 }
 
 
-bool Model_Multicut::GreedyRepair(vector<vector<double>>& Sol, vector<double>& Budget, vector<vector<vector<bool>>>& coverage)
+bool Model_Strengthened::GreedyRepair(vector<vector<double>>& Sol, vector<double>& Budget, vector<vector<vector<bool>>>& coverage)
 {
 	vector<int> frac = GetFractional(Sol);
 	if (frac.size() == 0) {
@@ -1187,12 +1108,12 @@ bool Model_Multicut::GreedyRepair(vector<vector<double>>& Sol, vector<double>& B
 			else { previous = Sol[t - 1][j]; }
 
 			double delta = Sol[t][j] - previous;
-			if (previous < 1) { Budget[t] += delta * (double) data.params["f"][t][j] ; }
-			Budget[t] += delta * (double) data.params["c"][t][j] ;
+			if (previous < 1) { Budget[t] += delta * (double)data.params["f"][t][j]; }
+			Budget[t] += delta * (double)data.params["c"][t][j];
 
 			newSolution[t][j] = 0;
 		}
-		
+
 	}
 
 
@@ -1209,8 +1130,8 @@ bool Model_Multicut::GreedyRepair(vector<vector<double>>& Sol, vector<double>& B
 			if (lb == previous) { continue; }
 			int delta = lb - previous;
 			if (delta > 0) {
-				if (previous == 0) { Budget[t] -= (double) data.params["f"][t][j]; }
-				Budget[t] -= (double) data.params["c"][t][j] * delta;
+				if (previous == 0) { Budget[t] -= (double)data.params["f"][t][j]; }
+				Budget[t] -= (double)data.params["c"][t][j] * delta;
 			}
 		}
 
@@ -1234,15 +1155,15 @@ bool Model_Multicut::GreedyRepair(vector<vector<double>>& Sol, vector<double>& B
 				Costs[jBar] = 0.0;
 			}
 
-			
+
 			//Check for coverage from new stations
 			for (int i = 0; i < data.N; i++) {
 				double weight = (double)data.params["Ni"][t][i] / (double)data.R[i];
 				for (int r = 0; r < data.R[i]; r++) {
 					if (coverage[t][i][r]) { continue; }
-					for (long unsigned int jBar=0; jBar < frac.size();jBar++) {
+					for (long unsigned int jBar = 0; jBar < frac.size(); jBar++) {
 						int j = frac[jBar];
-						if (data.a[t][i][r][j][newSolution[t][j] + 1]) {
+						if (data.aBar[t][i][r][j][newSolution[t][j] + 1]) {
 							StationTotals[jBar] += weight;
 						}
 					}
@@ -1253,14 +1174,14 @@ bool Model_Multicut::GreedyRepair(vector<vector<double>>& Sol, vector<double>& B
 			for (long unsigned int jBar = 0; jBar < frac.size(); jBar++) {
 				int j = frac[jBar];
 				//Ceiling of current value reached
-				if (newSolution[t][j] >= ceil(Sol[t][j])) { 
+				if (newSolution[t][j] >= ceil(Sol[t][j])) {
 					StationTotals[jBar] = 0.0;
 					continue;
 				}
 
 				//Budget insufficient for new outlet
-				Costs[jBar] += (double) data.params["c"][t][j];
-				if (newSolution[t][j] == 0) { Costs[jBar] += (double) data.params["f"][t][j]; }
+				Costs[jBar] += (double)data.params["c"][t][j];
+				if (newSolution[t][j] == 0) { Costs[jBar] += (double)data.params["f"][t][j]; }
 				if (Costs[jBar] > Budget[t]) {
 					StationTotals[jBar] = 0.0;
 				}
@@ -1281,7 +1202,7 @@ bool Model_Multicut::GreedyRepair(vector<vector<double>>& Sol, vector<double>& B
 					//Update coverage of triplets
 					for (int i = 0; i < data.N; i++) {
 						for (int r = 0; r < data.R[i]; r++) {
-							if ((!coverage[tBar][i][r]) && (data.a[tBar][i][r][j_star][newSolution[tBar][j_star]])) {
+							if ((!coverage[tBar][i][r]) && (data.aBar[tBar][i][r][j_star][newSolution[tBar][j_star]])) {
 								coverage[tBar][i][r] = 1;
 							}
 						}

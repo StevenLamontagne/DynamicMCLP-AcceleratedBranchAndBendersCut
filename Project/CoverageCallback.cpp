@@ -125,7 +125,7 @@ void CoverageCallback::AddCuts(const IloCplex::Callback::Context& context, const
 						}
 						else {
 							vector<pair<int, int>> cover = data.cover[t][i][r];
-							for (int jBar = 0; jBar < cover.size(); jBar++) {
+							for (long unsigned int jBar = 0; jBar < cover.size(); jBar++) {
 								int j = cover[jBar].first;
 								int k0 = cover[jBar].second;
 								for (int k = k0; k < Mj[j]; k++) {
@@ -170,7 +170,7 @@ void CoverageCallback::AddCuts(const IloCplex::Callback::Context& context, const
 						}
 						else {
 							vector<pair<int, int>> cover = data.cover[t][i][r];
-							for (int jBar = 0; jBar < cover.size(); jBar++) {
+							for (long unsigned int jBar = 0; jBar < cover.size(); jBar++) {
 								int j = cover[jBar].first;
 								int k0 = cover[jBar].second;
 								for (int k = k0; k < Mj[j]; k++) {
@@ -203,7 +203,7 @@ void CoverageCallback::AddCuts(const IloCplex::Callback::Context& context, const
 						}
 						else {
 							vector<pair<int, int>> cover = data.cover[t][i][r];
-							for (int jBar = 0; jBar < cover.size(); jBar++) {
+							for (long unsigned int jBar = 0; jBar < cover.size(); jBar++) {
 								int j = cover[jBar].first;
 								int k0 = cover[jBar].second;
 								for (int k = k0; k < Mj[j]; k++) {

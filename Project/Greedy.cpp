@@ -40,7 +40,7 @@ void Greedy::Solve()
 					break;
 				default:
 					vector<pair<int, int>> cover = data.cover[t][i][r];
-					for (int jBar = 0; jBar < cover.size(); jBar++) {
+					for (long unsigned int jBar = 0; jBar < cover.size(); jBar++) {
 						int j = cover[jBar].first;
 						int k0 = cover[jBar].second;
 						if (Solution[t][j] >= k0) {
@@ -94,7 +94,6 @@ void Greedy::Solve()
 		{
 			//Reset values
 			foundImprovement = 0;
-			double coverable = 0.0;
 			for (int j = 0; j < M; j++) {
 				StationTotals[j] = 0.0;
 				Costs[j] = 0.0;
@@ -106,7 +105,7 @@ void Greedy::Solve()
 				for (int r = 0; r < R[i]; r++) {
 					if (coverage[t][i][r]) { continue; }
 					vector<pair<int, int>> cover = data.cover[t][i][r];
-					for (int jBar = 0; jBar < cover.size(); jBar++) {
+					for (long unsigned int jBar = 0; jBar < cover.size(); jBar++) {
 						int j = cover[jBar].first;
 						int k0 = cover[jBar].second;
 						if (Solution[t][j] + 1 >= k0) {
@@ -125,8 +124,8 @@ void Greedy::Solve()
 				}
 
 				//Budget insufficient for new outlet
-				Costs[j] += data.params["c"][t][j];
-				if (Solution[t][j] == 0) { Costs[j] += data.params["f"][t][j]; }
+				Costs[j] += (double) data.params["c"][t][j];
+				if (Solution[t][j] == 0) { Costs[j] += (double) data.params["f"][t][j]; }
 				if (Costs[j] > Budget[t]) {
 					StationTotals[j] = 0.0;
 				}
