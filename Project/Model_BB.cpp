@@ -148,10 +148,9 @@ void Model_BB::Solve()
 					break;
 				default:
 					IloExpr covering(env);
-					vector<pair<int, int>> cover = data.cover[t][i][r];
-					for (int jBar = 0; jBar < cover.size(); jBar++) {
-						int j = cover[jBar].first;
-						int k0 = cover[jBar].second;
+					for (pair<int, int> cover_triplet:data.cover_triplet[t][i][r]){
+						int j = cover_triplet.first;
+						int k0 = cover_triplet.second;
 						for (int k = k0; k < Mj[j]; k++) {
 							covering += x[t][j][k];
 						}

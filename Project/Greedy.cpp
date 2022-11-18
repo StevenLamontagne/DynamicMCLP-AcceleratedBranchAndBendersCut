@@ -1,7 +1,9 @@
 #include "Greedy.h"
 
-void Greedy::Solve()
-{
+void Greedy::Solve(bool _verbose)
+{	
+	verbose = _verbose;
+
 	//Define constants for easier reading and writing
 	int& T = data.T;
 	int& M = data.M;
@@ -26,28 +28,24 @@ void Greedy::Solve()
 		vector<vector<bool>> cover1;
 		for (int i = 0; i < N; i++) {
 			vector<bool> cover2;
-			//double weight = (double)data.params["Ni"][t][i] / (double)R[i];
 			for (int r = 0; r < R[i]; r++) {
 				bool val = 0;
 				switch (data.P[t][i][r])
 				{
 				case triplet::Uncoverable:
-					val = 1; //Set to 1 to skip trying to cover later
+					val = 1; //Set to 1 to skip trying to cover_triplet later
 					break;
 				case triplet::Precovered:
 					val = 1;
-					//SolutionQuality += weight;
 					break;
 				default:
-					vector<pair<int, int>> cover = data.cover[t][i][r];
-					for (long unsigned int jBar = 0; jBar < cover.size(); jBar++) {
-						int j = cover[jBar].first;
-						int k0 = cover[jBar].second;
+					for (pair<int, int> cover_triplet : data.cover_triplet[t][i][r]) {
+						int j = cover_triplet.first;
+						int k0 = cover_triplet.second;
 						if (Solution[t][j] >= k0) {
 							val = 1;
 						}
 					}
-					//if (val) { SolutionQuality += weight; }
 					break;
 				}
 				cover2.push_back(val);
@@ -56,8 +54,10 @@ void Greedy::Solve()
 		}
 		coverage.push_back(cover1);
 	}
-	cout << "Initial coverage: " << SolutionQuality << endl;
-	cout << "\n" << endl;
+	if (verbose) {
+		cout << "Initial coverage: " << SolutionQuality << endl << "\n" << endl;
+	}
+	
 
 	//Initialise vectors for holding information for each station
 	vector<double> StationTotals;
@@ -69,26 +69,9 @@ void Greedy::Solve()
 
 	//Greedy optimisation
 	for (int t = 0; t < T; t++) {
-		cout << "Starting year " << t << endl;
+		if (verbose) { cout << "Starting year " << t << endl; }
 		bool foundImprovement;
 		
-		////Check for coverage from initial solution/solution from last year
-		//for (int i = 0; i < N; i++) {
-		//	double weight = (double)data.params["Ni"][t][i] / (double)R[i];
-		//	for (int r = 0; r < R[i]; r++) {
-		//		if (coverage[t][i][r]) { continue; }
-		//		vector<pair<int, int>> cover = data.cover[t][i][r];
-		//		for (int jBar = 0; jBar < cover.size(); jBar++) {
-		//			int j = cover[jBar].first;
-		//			int k0 = cover[jBar].second;
-		//			if (Solution[t][j] >= k0) {
-		//				coverage[t][i][r] = 1;
-		//			}
-		//		}
-		//		if (coverage[t][i][r]) { SolutionQuality += weight; }
-		//	}
-		//}
-
 		//Start adding outlets
 		do
 		{
@@ -104,12 +87,11 @@ void Greedy::Solve()
 				double weight = (double)data.params["Ni"][t][i] / (double)R[i];
 				for (int r = 0; r < R[i]; r++) {
 					if (coverage[t][i][r]) { continue; }
-					vector<pair<int, int>> cover = data.cover[t][i][r];
-					for (long unsigned int jBar = 0; jBar < cover.size(); jBar++) {
-						int j = cover[jBar].first;
-						int k0 = cover[jBar].second;
+					for (pair<int, int> cover_triplet : data.cover_triplet[t][i][r]) {
+						int j = cover_triplet.first;
+						int k0 = cover_triplet.second;
 						if (Solution[t][j] + 1 >= k0) {
-								StationTotals[j] += weight;
+							StationTotals[j] += weight;
 						}
 					}
 				}
@@ -129,16 +111,16 @@ void Greedy::Solve()
 				if (Costs[j] > Budget[t]) {
 					StationTotals[j] = 0.0;
 				}
-				//cout << "Coverage of station " << j << ": " << StationTotals[j] << endl;
 			}
 
 
 			int j_star = argmax(StationTotals);
 			double z_star = StationTotals[j_star];
 			if (z_star > 0) {
-				cout << "Found improvement of amount " << z_star << endl;
-				cout << "Adding outlet at station " << j_star << endl;
-				
+				if (verbose) {
+					cout << "Found improvement of amount " << z_star << endl;
+					cout << "Adding outlet at station " << j_star << endl;
+				}
 				//Update budget
 				Budget[t] -= Costs[j_star];
 
@@ -148,22 +130,19 @@ void Greedy::Solve()
 
 					//Update coverage of triplets
 					for (int i = 0; i < N; i++) {
-						//double weight = (double)data.params["Ni"][t][i] / (double)R[i];
 						for (int r = 0; r < R[i]; r++) {
 							if ((!coverage[tBar][i][r]) && (data.a[tBar][i][r][j_star][Solution[tBar][j_star]])) {
-								coverage[tBar][i][r] = 1;
-								//SolutionQuality += weight;
+								coverage[tBar][i][r] = 1;								
 							}
 						}
 					}
 				}
 				foundImprovement = 1;	
-				//cout << "Coverable left: " << coverable << endl;
 			}
 
 
 		} while (foundImprovement);
-		cout << "\n" << endl;
+		if (verbose) { cout << "\n" << endl; }
 	}
 	SolveTime = chrono::duration_cast<chrono::duration<double>>(chrono::steady_clock::now() - t1).count();
 	SolutionQuality = data.SolutionQuality(Solution);

@@ -6,6 +6,7 @@
 #include <utility>
 #include <ctime>
 #include <exception>
+#include <map>
 
 #ifdef _WIN32
 #include <nlohmann/json.hpp>
@@ -40,7 +41,9 @@ public:
 	vector<vector<vector<vector<vector<bool>>>>> a;
 	vector<vector<vector<bool>>> home;
 	vector<vector<vector<triplet>>> P;
-	vector<vector<vector<vector<pair<int, int>>>>> cover;
+	vector<vector<vector<vector<pair<int, int>>>>> cover_triplet;
+	vector<vector<vector<vector<pair<int, int>>>>> cover_station;
+	vector<map<pair<int, int>, map<pair<int, int>, double>>> overlap;
 
 	void load(string file, bool verbose);
 	double SolutionQuality(vector<vector<int>> Sol);

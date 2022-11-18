@@ -124,10 +124,9 @@ void CoverageCallback::AddCuts(const IloCplex::Callback::Context& context, const
 							covered += weight;
 						}
 						else {
-							vector<pair<int, int>> cover = data.cover[t][i][r];
-							for (long unsigned int jBar = 0; jBar < cover.size(); jBar++) {
-								int j = cover[jBar].first;
-								int k0 = cover[jBar].second;
+							for (pair<int, int> cover_triplet:data.cover_triplet[t][i][r]){
+								int j = cover_triplet.first;
+								int k0 = cover_triplet.second;
 								for (int k = k0; k < Mj[j]; k++) {
 									lhs += weight * x[t][j][k];
 								}
@@ -156,8 +155,8 @@ void CoverageCallback::AddCuts(const IloCplex::Callback::Context& context, const
 							covered += weight;
 						}
 						else {
-							int j = data.cover[t][i][r][0].first;
-							int k0 = data.cover[t][i][r][0].second;
+							int j = data.cover_triplet[t][i][r][0].first;
+							int k0 = data.cover_triplet[t][i][r][0].second;
 							for (int k = k0; k < Mj[j]; k++) {
 								lhs += weight * x[t][j][k];
 
@@ -169,10 +168,9 @@ void CoverageCallback::AddCuts(const IloCplex::Callback::Context& context, const
 							covered += weight;
 						}
 						else {
-							vector<pair<int, int>> cover = data.cover[t][i][r];
-							for (long unsigned int jBar = 0; jBar < cover.size(); jBar++) {
-								int j = cover[jBar].first;
-								int k0 = cover[jBar].second;
+							for (pair<int, int> cover_triplet:data.cover_triplet[t][i][r]){
+								int j = cover_triplet.first;
+								int k0 = cover_triplet.second;
 								for (int k = k0; k < Mj[j]; k++) {
 									lhs += weight * x[t][j][k];
 								}
@@ -202,10 +200,9 @@ void CoverageCallback::AddCuts(const IloCplex::Callback::Context& context, const
 							covered += weight;
 						}
 						else {
-							vector<pair<int, int>> cover = data.cover[t][i][r];
-							for (long unsigned int jBar = 0; jBar < cover.size(); jBar++) {
-								int j = cover[jBar].first;
-								int k0 = cover[jBar].second;
+							for (pair<int, int> cover_triplet:data.cover_triplet[t][i][r]){
+								int j = cover_triplet.first;
+								int k0 = cover_triplet.second;
 								for (int k = k0; k < Mj[j]; k++) {
 									lhs += weight * x[t][j][k];
 								}

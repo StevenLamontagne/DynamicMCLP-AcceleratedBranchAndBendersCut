@@ -1,9 +1,9 @@
 #pragma once
 #include <ilcplex/ilocplex.h>
 #include <exception>
-#include <ctime>
-#include <chrono>
 #include <map>
+#include <chrono>
+
 
 #include "Data.h"
 
@@ -27,8 +27,6 @@ enum class multicuts :short int {
 	Multi3B1,
 	Multi3B2,
 	Multi1SB1,
-	Multi1SB2,
-	Multi3SB1,
 	Multi3SB2
 
 };
@@ -43,17 +41,21 @@ enum class useHeuristic :char {
 class MulticutCallback : public IloCplex::Callback::Function
 {
 private:
+	//Set to private to ban usage
 	MulticutCallback();
 	MulticutCallback(const MulticutCallback& tocopy);
 
+	//Data members
 	Data data;
 	BoolVar3D x;
 	BoolVar2D y;
-	NumVar2D theta; // need array if multicut (need template?)
-	multicuts cut_type = multicuts::SingleB2;
+	NumVar2D theta; 
+	multicuts cut_type = multicuts::Multi1B1;
 	useHeuristic heuristic = useHeuristic::Warmstart;
 	double incumbent = 0.0;
-	IloArray<IloExpr> BudgetConstraints;
+
+	//Integer overflow is intended here
+	unsigned char PHcounter = 1;
 
 
 	//Define constants for easier reading and writing
@@ -63,36 +65,36 @@ private:
 	vector<int>& Mj = data.Mj;
 	vector<int>& R = data.R;
 
+	//Functions for adding cuts
 	void LazyCutCallback(const IloCplex::Callback::Context& context, const IloArray<IloArray<IloNumArray>>& x_tilde);
 	void UserCutCallback(const IloCplex::Callback::Context& context, const IloArray<IloArray<IloNumArray>>& x_tilde);
-	void AddCuts(const IloCplex::Callback::Context& context, const Num3D& I_tilde);
-	void AddStrengthenedCuts_User(const IloCplex::Callback::Context& context, const IloArray<IloArray<IloNumArray>>& x_tilde, const Num3D& I_tilde);
-	void AddStrengthenedCuts_Lazy(const IloCplex::Callback::Context& context, const IloArray<IloNumArray>& x_tilde, const Num3D& I_tilde);
+	void AddCuts(const IloCplex::Callback::Context& context, const IloArray<IloArray<IloNumArray>>& x_tilde, const Num3D& I_tilde);
 
-	//int argmax(vector<double> vec) {
-	//	auto maxVal = max_element(vec.begin(), vec.end());
-	//	int argmaxVal = distance(vec.begin(), maxVal);
-	//	return argmaxVal;
-	//};
-
+	//Functions for heuristics
 	pair<int, int> argmax(map<pair<int, int>, double> vec);
-
 	vector<map<int, vector<int>>> GetFractional(const IloArray<IloArray<IloNumArray>>& x_tilde);
-
-public:
-	MulticutCallback(const Data& _data, const BoolVar3D& _x, const BoolVar2D& _y, const NumVar2D& _theta,multicuts _cut_type, useHeuristic _heuristic) :data(_data), x(_x), y(_y), theta(_theta), cut_type(_cut_type), heuristic(_heuristic) {
-
-	};
-
-	virtual void invoke(const IloCplex::Callback::Context& context);
-
 	bool SimpleRepair(IloEnv& env, IloArray<IloArray<IloNumArray>>& x_tilde, vector<double>& Budget, IloArray<IloArray<IloBoolArray>>& coverage);
 	bool GreedyRepair(IloEnv& env, IloArray<IloArray<IloNumArray>>& x_tilde, vector<double>& Budget, IloArray<IloArray<IloBoolArray>>& coverage);
 	bool GreedyFill(IloEnv& env, IloArray<IloArray<IloNumArray>>& x_tilde, vector<double>& Budget, IloArray<IloArray<IloBoolArray>>& coverage);
 	void AddPostHeuristic(const IloCplex::Callback::Context& context, IloArray<IloArray<IloNumArray>>& x_tilde);
 
-	int repairCounter = 0;
-	int totalCounter = 0;
+
+public:
+	MulticutCallback(const Data& _data, const BoolVar3D& _x, const BoolVar2D& _y, const NumVar2D& _theta,multicuts _cut_type, useHeuristic _heuristic) :data(_data), x(_x), y(_y), theta(_theta), cut_type(_cut_type), heuristic(_heuristic) {
+
+	};
+	virtual void invoke(const IloCplex::Callback::Context& context);
+	double threshold = 0.1;
+	map<string, int> stats = {
+		{"nOverlapCuts", 0},
+		{"nPostRepairs", 0},
+		{"nPostFills", 0},
+		{"nPostInfeasible", 0},
+		{"nLazyCuts", 0},
+		{"nUserCuts", 0}
+	};
+
+
 
 
 

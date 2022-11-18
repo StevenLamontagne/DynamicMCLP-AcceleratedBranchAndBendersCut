@@ -14,11 +14,13 @@ class Greedy
 {
 public:
 	void SetData(const Data& newData) { data = newData; };
-	void Solve();
+	void Solve(bool _verbose = false);
 
 	double SolveTime;
 	vector<vector<int>> Solution;
 	double SolutionQuality = 0.0;
+
+	bool verbose = false;
 	
 private:
 	Data data;

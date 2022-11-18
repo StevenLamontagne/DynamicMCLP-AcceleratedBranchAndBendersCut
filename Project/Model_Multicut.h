@@ -11,39 +11,38 @@
 class Model_Multicut
 {
 public:
-	void SetData(const Data& newData) { data = newData; };
-	void Solve(multicuts cut_type, useHeuristic heuristic, int nGRASP);
+	void SetData(const Data& newData);
+	void Solve(multicuts _multicut = multicuts::Multi1B1, useHeuristic _heuristic = useHeuristic::Warmstart, int _nGRASP = 0, bool _verbose = false);
 
+	//Storing information about solution
 	float ObjectiveValue;
 	float SolveTime;
 	float TotalTime;
 	vector<vector<int>> Solution;
 	float OptimalityGap;
+
+	//Options
 	multicuts multicut = multicuts::Multi1B1;
+	useHeuristic heuristic = useHeuristic::Warmstart;
+	int nGRASP = 0;
+	bool verbose = false;
+	double threshold = 0.1;
 
-	double RepairRatio = 0;
+	//Storing solving statistics
+	map<string, int> stats;
 
-	bool GreedyRepair(vector<vector<double>>& Sol, vector<double>& Budget, vector<vector<vector<bool>>>& coverage);
-	bool GreedyFill(vector<vector<double>>& Sol, vector<double>& Budget, vector<vector<vector<bool>>>& coverage);
-	bool GRASPCut(IloEnv& env, IloModel& model, BoolVar3D& x, IloArray<IloNumVarArray>& theta);
+
+
+	
 
 private:
 	Data data;
 
-	int argmax(vector<double> vec) {
-		auto maxVal = max_element(vec.begin(), vec.end());
-		int argmaxVal = distance(vec.begin(), maxVal);
-		return argmaxVal;
-	};
+	//vector<map<pair<int, int>, vector<pair<int, int>>>> cover_station;
+	vector<vector<vector<vector<pair<int, int>>>>> cover_station;
+	vector<map<pair<int, int>, map<pair<int, int>, double>>> overlap;
 
-	template <class T>
-	double sum(T vec) {
-		double val = 0.0;
-		for (auto i : vec) { val += i; }
-		return val;
-	};
-
-	vector<int> GetFractional(vector<vector<double>> Sol);
+	bool GRASPCut(IloEnv& env, IloModel& model, BoolVar3D& x, IloArray<IloNumVarArray>& theta);
 
 	
 
