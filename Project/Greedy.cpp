@@ -17,7 +17,11 @@ void Greedy::Solve(bool _verbose)
 		//Initialise solution to x0
 		vector<int>  Sol1;
 		for (int j = 0; j < M; j++) {
-			Sol1.push_back(data.params["x0"][j]);
+			int val = 0;
+			for (int k = 1; k < Mj[j]; k++) {
+				if (data.params["x0"][j] == 1) { val = k; }
+			}
+			Sol1.push_back(val);
 		}
 		Solution.push_back(Sol1);
 
@@ -106,8 +110,7 @@ void Greedy::Solve(bool _verbose)
 				}
 
 				//Budget insufficient for new outlet
-				Costs[j] += (double) data.params["c"][t][j];
-				if (Solution[t][j] == 0) { Costs[j] += (double) data.params["f"][t][j]; }
+				Costs[j] = (double) data.params["c"][t][j][Solution[t][j]+1];
 				if (Costs[j] > Budget[t]) {
 					StationTotals[j] = 0.0;
 				}

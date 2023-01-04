@@ -48,7 +48,6 @@ private:
 	//Data members
 	Data data;
 	BoolVar3D x;
-	BoolVar2D y;
 	NumVar2D theta; 
 	multicuts cut_type = multicuts::Multi1B1;
 	useHeuristic heuristic = useHeuristic::Warmstart;
@@ -80,7 +79,7 @@ private:
 
 
 public:
-	MulticutCallback(const Data& _data, const BoolVar3D& _x, const BoolVar2D& _y, const NumVar2D& _theta,multicuts _cut_type, useHeuristic _heuristic) :data(_data), x(_x), y(_y), theta(_theta), cut_type(_cut_type), heuristic(_heuristic) {
+	MulticutCallback(const Data& _data, const BoolVar3D& _x, const NumVar2D& _theta,multicuts _cut_type, useHeuristic _heuristic) :data(_data), x(_x), theta(_theta), cut_type(_cut_type), heuristic(_heuristic) {
 
 	};
 	virtual void invoke(const IloCplex::Callback::Context& context);

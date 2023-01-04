@@ -1,34 +1,10 @@
 {
-   "M1SB1": {
-      "nLazyCuts": [],
-      "nNodes": [],
-      "nOverlapCuts": [],
-      "nPostFills": [],
-      "nPostInfeasible": [],
-      "nPostRepairs": [],
-      "nUserCuts": []
-   },
-   "m1sb1": {
-      "nLazyCuts": [
-         13
-      ],
-      "nNodes": [
-         152
-      ],
-      "nOverlapCuts": [
-         423
-      ],
-      "nPostFills": [
-         0
-      ],
-      "nPostInfeasible": [
-         0
-      ],
-      "nPostRepairs": [
-         0
-      ],
-      "nUserCuts": [
-         349
-      ]
-   }
+   "TrustSolveTime(DivideBy100)": 45,
+   "nLazyCuts": 14,
+   "nNodes": 59,
+   "nOverlapCuts": 0,
+   "nPostFills": 0,
+   "nPostInfeasible": 0,
+   "nPostRepairs": 0,
+   "nUserCuts": 204
 }

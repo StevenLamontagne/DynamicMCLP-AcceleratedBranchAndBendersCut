@@ -43,10 +43,6 @@ void Model_BB::Solve()
 		}
 	}
 	
-	BoolVar2D y(env, T);
-	for (int t = 0; t < T; t++) {
-		y[t] = IloBoolVarArray(env, M);
-	}
 
 	BoolVar3D w(env, T);
 	for (int t = 0; t < T; t++) {
@@ -61,76 +57,48 @@ void Model_BB::Solve()
 	////Budget, year 0
 	IloExpr budget0(env);
 	for (int j = 0; j < M; j++) {
-		IloExpr n_outlets(env);
 		for (int k = 1; k < Mj[j]; k++) {
-			n_outlets += k * x[0][j][k];
+			budget0 += (double)data.params["c"][0][j][k] * (x[0][j][k] - (int)data.params["x0"][j][k]);
 		}
-		budget0 += (data.params["c"][0][j]) * (n_outlets - data.params["x0"][j]);
-		budget0 += ((int)data.params["f"][0][j]) * (y[0][j] - (int)data.params["y0"][j]);
-		n_outlets.end();
 	}
-	model.add(budget0 <= (int)data.params["B"][0]);
+	model.add(budget0 <= (double)data.params["B"][0]);
 	budget0.end();
 
 	////Budget, year 1+
 	for (int t = 1; t < T; t++) {
 		IloExpr budget(env);
 		for (int j = 0; j < M; j++) {
-			IloExpr n_outlets(env);
 			for (int k = 1; k < Mj[j]; k++) {
-				n_outlets += k * (x[t][j][k] - x[t-1][j][k]);
+				budget += (double)data.params["c"][t][j][k] * (x[t][j][k] - x[t - 1][j][k]);
 			}
-			budget += ((int)data.params["c"][t][j]) * (n_outlets);
-			
-			budget += ((int)data.params["f"][t][j]) * (y[t][j] - y[t-1][j]);
-			n_outlets.end();
 		}
-		model.add(budget <= (int)data.params["B"][t]);
+		model.add(budget <= (double)data.params["B"][t]);
 		budget.end();
 	}
 
+
 	////Can't remove outlets, year 0
 	for (int j = 0; j < M; j++) {
-		IloExpr KeepX(env);
-		int mj = data.params["Mj"][j];
-		for (int k = 1; k < mj; k++) {
-			KeepX += k * x[0][j][k];
+		for (int k = 1; k < Mj[j]; k++) {
+			model.add(x[0][j][k] >= (int)data.params["x0"][j][k]);
 		}
-		model.add(KeepX >= (int)data.params["x0"][j]);
-		KeepX.end();
 	}
 
 	////Can't remove outlets, year 1+
 	for (int t = 1; t < T; t++) {
 		for (int j = 0; j < M; j++) {
-			IloExpr KeepXt1(env);
-			IloExpr KeepXt2(env);
 			for (int k = 1; k < Mj[j]; k++) {
-				KeepXt1 += k * x[t][j][k];
-				KeepXt2 += k * x[t-1][j][k];
+				model.add(x[t][j][k] >= x[t - 1][j][k]);
 			}
-			model.add(KeepXt1 >= KeepXt2);
-			KeepXt1.end();
-			KeepXt2.end();
 		}
 	}
 
-	////Can't close stations, year 0+
-	for (int j = 0; j < M; j++) {
-		model.add(y[0][j] >= (int)data.params["y0"][j]);
-		for (int t = 1; t < T; t++) {
-			model.add(y[t][j] >= y[t - 1][j]);
-		}
-	}
-
-	////Pay one-time cost
+	////At least k outlets, year 0+
 	for (int t = 0; t < T; t++) {
 		for (int j = 0; j < M; j++) {
-			IloExpr open(env);
 			for (int k = 1; k < Mj[j]; k++) {
-				open += x[t][j][k];
+				model.add(x[t][j][k] <= x[t][j][k - 1]);
 			}
-			model.add(open == y[t][j]);
 		}
 	}
 
@@ -186,7 +154,7 @@ void Model_BB::Solve()
 			for (int j = 0; j < M; j++) {
 				int total = 0;
 				for (int k = 1; k < Mj[j]; k++) {
-					if (cplex.getValue(x[t][j][k]) > 1 - EPS) {
+					if ((cplex.getValue(x[t][j][k]) > 1 - EPS) && (k > total) ) {
 						total = k;
 						break;
 					}

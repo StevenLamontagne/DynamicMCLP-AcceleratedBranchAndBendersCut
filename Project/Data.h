@@ -46,6 +46,7 @@ public:
 	vector<map<pair<int, int>, map<pair<int, int>, double>>> overlap;
 
 	void load(string file, bool verbose);
+	void load_compressed(string set, string file, bool verbose);
 	double SolutionQuality(vector<vector<int>> Sol);
 
 	template <class Temp>
@@ -67,5 +68,6 @@ public:
 
 private:
 	void create_covering(bool verbose);
+	void create_covering_compressed(string path, string test, bool verbose);
 };
 

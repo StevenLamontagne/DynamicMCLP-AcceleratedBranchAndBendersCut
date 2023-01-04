@@ -12,7 +12,9 @@ class Model_Multicut
 {
 public:
 	void SetData(const Data& newData);
-	void Solve(multicuts _multicut = multicuts::Multi1B1, useHeuristic _heuristic = useHeuristic::Warmstart, int _nGRASP = 0, bool _verbose = false);
+	void Solve(json params);
+
+	void GetSolution(IloCplex& cplex, BoolVar3D& x);
 
 	//Storing information about solution
 	float ObjectiveValue;
@@ -26,7 +28,10 @@ public:
 	useHeuristic heuristic = useHeuristic::Warmstart;
 	int nGRASP = 0;
 	bool verbose = false;
-	double threshold = 0.1;
+	double overlap_threshold = 0.1;
+	double grasp_threshold = 0.85;
+	bool use_trust = false;
+	double trust_threshold = 2.5;
 
 	//Storing solving statistics
 	map<string, int> stats;

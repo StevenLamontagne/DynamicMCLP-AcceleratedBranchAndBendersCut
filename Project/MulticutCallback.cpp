@@ -526,44 +526,44 @@ void MulticutCallback::AddPostHeuristic(const IloCplex::Callback::Context& conte
 	
 	//Initialise budget
 	vector<double> Budget = data.params["B"];
-	IloExpr budget0(env);
-	for (int j = 0; j < M; j++) {
-		IloExpr n_outlets(env);
-		for (int k = 1; k < Mj[j]; k++) {
-			n_outlets += k * x[0][j][k];
-		}
-		budget0 += (data.params["c"][0][j]) * (n_outlets - data.params["x0"][j]);
-		budget0 += ((int)data.params["f"][0][j]) * (y[0][j] - (int)data.params["y0"][j]);
-		n_outlets.end();
-	}
-	double current = 0.0;
-	if (context.getId() == IloCplex::Callback::Context::Id::Relaxation) {
-		current = context.getRelaxationValue(budget0);
-	}
-	else { current = context.getCandidateValue(budget0); }
-	Budget[0] -= current;
-	budget0.end();
+	//IloExpr budget0(env);
+	//for (int j = 0; j < M; j++) {
+	//	IloExpr n_outlets(env);
+	//	for (int k = 1; k < Mj[j]; k++) {
+	//		n_outlets += k * x[0][j][k];
+	//	}
+	//	budget0 += (data.params["c"][0][j]) * (n_outlets - data.params["x0"][j]);
+	//	budget0 += ((int)data.params["f"][0][j]) * (y[0][j] - (int)data.params["y0"][j]);
+	//	n_outlets.end();
+	//}
+	//double current = 0.0;
+	//if (context.getId() == IloCplex::Callback::Context::Id::Relaxation) {
+	//	current = context.getRelaxationValue(budget0);
+	//}
+	//else { current = context.getCandidateValue(budget0); }
+	//Budget[0] -= current;
+	//budget0.end();
 
-	for (int t = 1; t < T; t++) {
-		IloExpr budget(env);
-		for (int j = 0; j < M; j++) {
-			IloExpr n_outlets(env);
-			for (int k = 1; k < Mj[j]; k++) {
-				n_outlets += k * (x[t][j][k] - x[t - 1][j][k]);
-			}
-			budget += ((int)data.params["c"][t][j]) * (n_outlets);
+	//for (int t = 1; t < T; t++) {
+	//	IloExpr budget(env);
+	//	for (int j = 0; j < M; j++) {
+	//		IloExpr n_outlets(env);
+	//		for (int k = 1; k < Mj[j]; k++) {
+	//			n_outlets += k * (x[t][j][k] - x[t - 1][j][k]);
+	//		}
+	//		budget += ((int)data.params["c"][t][j]) * (n_outlets);
 
-			budget += ((int)data.params["f"][t][j]) * (y[t][j] - y[t - 1][j]);
-			n_outlets.end();
-		}
-		double current = 0.0;
-		if (context.getId() == IloCplex::Callback::Context::Id::Relaxation) {
-			current = context.getRelaxationValue(budget);
-		}
-		else { current = context.getCandidateValue(budget); }
-		Budget[t] -= current;
-		budget.end();
-	}
+	//		budget += ((int)data.params["f"][t][j]) * (y[t][j] - y[t - 1][j]);
+	//		n_outlets.end();
+	//	}
+	//	double current = 0.0;
+	//	if (context.getId() == IloCplex::Callback::Context::Id::Relaxation) {
+	//		current = context.getRelaxationValue(budget);
+	//	}
+	//	else { current = context.getCandidateValue(budget); }
+	//	Budget[t] -= current;
+	//	budget.end();
+	//}
 
 	//Initialise coverage
 	IloArray<IloArray<IloBoolArray>> coverage(env, T);
@@ -630,14 +630,10 @@ void MulticutCallback::AddPostHeuristic(const IloCplex::Callback::Context& conte
 
 		for (int t = 0; t < T; t++) {
 			for (int j = 0; j < M; j++) {
-				int val = 0;
 				for (int k = 0; k < Mj[j]; k++) {
 					startVar.add(x[t][j][k]);
 					startVal.add(x_tilde[t][j][k]);
-					if (k >= 1 && x_tilde[t][j][k] > 1 - EPS) { val = 1; }
 				}
-				startVar.add(y[t][j]);
-				startVal.add(val);
 			}
 		}
 
@@ -752,10 +748,7 @@ void MulticutCallback::AddCuts(const IloCplex::Callback::Context& context, const
 						else {
 							int j = data.cover_triplet[t][i][r][0].first;
 							int k0 = data.cover_triplet[t][i][r][0].second;
-							for (int k = k0; k < Mj[j]; k++) {
-								lhs += weight * x[t][j][k];
-
-							}
+							lhs += weight * x[t][j][k0];
 						}
 					}
 					else {
@@ -766,9 +759,7 @@ void MulticutCallback::AddCuts(const IloCplex::Callback::Context& context, const
 							for (pair<int, int> cover_triplet : data.cover_triplet[t][i][r]) {
 								int j = cover_triplet.first;
 								int k0 = cover_triplet.second;
-								for (int k = k0; k < Mj[j]; k++) {
-									lhs += weight * x[t][j][k];
-								}
+								lhs += weight * x[t][j][k0];
 							}
 						}
 					}
@@ -815,9 +806,7 @@ void MulticutCallback::AddCuts(const IloCplex::Callback::Context& context, const
 							for (pair<int, int> cover_triplet : data.cover_triplet[t][i][r]) {
 								int j = cover_triplet.first;
 								int k0 = cover_triplet.second;
-								for (int k = k0; k < Mj[j]; k++) {
-									lhs += weight * x[t][j][k];
-								}
+								lhs += weight * x[t][j][k0];
 							}
 						}
 					}
@@ -922,10 +911,7 @@ void MulticutCallback::AddCuts(const IloCplex::Callback::Context& context, const
 						else {
 							int j = data.cover_triplet[t][i][r][0].first;
 							int k0 = data.cover_triplet[t][i][r][0].second;
-							for (int k = k0; k < Mj[j]; k++) {
-								lhs += weight * x[t][j][k];
-
-							}
+							lhs += weight * x[t][j][k0];
 						}
 					}
 					else {
@@ -936,9 +922,7 @@ void MulticutCallback::AddCuts(const IloCplex::Callback::Context& context, const
 							for (pair<int, int> cover : data.cover_triplet[t][i][r]) {
 								int j = cover.first;
 								int k0 = cover.second;
-								for (int k = k0; k < Mj[j]; k++) {
-									lhs += weight * x[t][j][k];
-								}
+								lhs += weight * x[t][j][k0];
 							}
 						}
 					}
@@ -985,9 +969,7 @@ void MulticutCallback::AddCuts(const IloCplex::Callback::Context& context, const
 							for (pair<int, int> cover_triplet : data.cover_triplet[t][i][r]) {
 								int j = cover_triplet.first;
 								int k0 = cover_triplet.second;
-								for (int k = k0; k < Mj[j]; k++) {
-									lhs += weight * x[t][j][k];
-								}
+								lhs += weight * x[t][j][k0];
 							}
 						}
 					}
@@ -1031,10 +1013,7 @@ void MulticutCallback::AddCuts(const IloCplex::Callback::Context& context, const
 						else {
 							int j = data.cover_triplet[t][i][r][0].first;
 							int k0 = data.cover_triplet[t][i][r][0].second;
-							for (int k = k0; k < Mj[j]; k++) {
-								lhs += weight * x[t][j][k];
-
-							}
+							lhs += weight * x[t][j][k0];
 						}
 					}
 					else {
@@ -1045,9 +1024,7 @@ void MulticutCallback::AddCuts(const IloCplex::Callback::Context& context, const
 							for (pair<int, int> cover_triplet : data.cover_triplet[t][i][r]) {
 								int j = cover_triplet.first;
 								int k0 = cover_triplet.second;
-								for (int k = k0; k < Mj[j]; k++) {
-									lhs += weight * x[t][j][k];
-								}
+								lhs += weight * x[t][j][k0];
 							}
 						}
 					}
@@ -1092,9 +1069,7 @@ void MulticutCallback::AddCuts(const IloCplex::Callback::Context& context, const
 							for (pair<int, int> cover_triplet : data.cover_triplet[t][i][r]) {
 								int j = cover_triplet.first;
 								int k0 = cover_triplet.second;
-								for (int k = k0; k < Mj[j]; k++) {
-									lhs += weight * x[t][j][k];
-								}
+								lhs += weight * x[t][j][k0];
 							}
 						}
 					}
@@ -1138,10 +1113,7 @@ void MulticutCallback::AddCuts(const IloCplex::Callback::Context& context, const
 						else {
 							int j = data.cover_triplet[t][i][r][0].first;
 							int k0 = data.cover_triplet[t][i][r][0].second;
-							for (int k = k0; k < Mj[j]; k++) {
-								lhs += weight * x[t][j][k];
-
-							}
+							lhs += weight * x[t][j][k0];
 						}
 					}
 					else {
@@ -1152,9 +1124,7 @@ void MulticutCallback::AddCuts(const IloCplex::Callback::Context& context, const
 							for (pair<int, int> cover_triplet : data.cover_triplet[t][i][r]) {
 								int j = cover_triplet.first;
 								int k0 = cover_triplet.second;
-								for (int k = k0; k < Mj[j]; k++) {
-									lhs += weight * x[t][j][k];
-								}
+								lhs += weight * x[t][j][k0];
 							}
 						}
 					}
@@ -1199,9 +1169,7 @@ void MulticutCallback::AddCuts(const IloCplex::Callback::Context& context, const
 							for (pair<int, int> cover_triplet : data.cover_triplet[t][i][r]) {
 								int j = cover_triplet.first;
 								int k0 = cover_triplet.second;
-								for (int k = k0; k < Mj[j]; k++) {
-									lhs += weight * x[t][j][k];
-								}
+								lhs += weight * x[t][j][k0];
 							}
 						}
 					}

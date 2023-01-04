@@ -17,7 +17,6 @@ void Model_Multicut::SetData(const Data& newData)
 	int& N = data.N;
 	vector<int>& Mj = data.Mj;
 	vector<int>& R = data.R;
-
 	//time_t start;
 	//time(&start);
 
@@ -91,13 +90,21 @@ void Model_Multicut::SetData(const Data& newData)
 	//cout << "Overlap calculation time: " << time(NULL) - start << " seconds" << endl;
 }
 
-void Model_Multicut::Solve(multicuts _multicut, useHeuristic _heuristic, int _nGRASP, bool _verbose)
+
+void Model_Multicut::Solve(json params)
 {
 	//Set model parameters
-	multicut = _multicut;
-	heuristic = _heuristic;
-	nGRASP = _nGRASP;
-	verbose = _verbose;
+	multicut = params.value("multicut", multicuts::Multi1B1);
+	heuristic = params.value("heuristic", useHeuristic::Warmstart);
+	nGRASP = params.value("nGRASP", 0);
+	verbose = params.value("verbose", false);
+	overlap_threshold = params.value("overlap_threshold", 0.1);
+	grasp_threshold = params.value("grasp_threshold", 0.85);
+	use_trust = params.value("use_trust", false);
+	trust_threshold = params.value("trust_threshold", 2.5);
+
+	string outfile = params.value("outfile", "");
+	ofstream fout(outfile);
 
 	//Define constants for easier reading and writing
 	int& T = data.T;
@@ -105,7 +112,7 @@ void Model_Multicut::Solve(multicuts _multicut, useHeuristic _heuristic, int _nG
 	int& N = data.N;
 	vector<int>& Mj = data.Mj;
 	vector<int>& R = data.R;
-
+	
 
 	
 
@@ -116,16 +123,43 @@ void Model_Multicut::Solve(multicuts _multicut, useHeuristic _heuristic, int _nG
 	IloModel model(env);
 	IloCplex cplex(model);
 
+	if (outfile != "") {
+		cplex.setOut(fout);
+		cplex.setWarning(fout);
+		cplex.setError(fout);
+		cplex.out() << "Log sent to file" << endl;
+	}
+	else {
+		cout << "No log file provided" << endl;
+	}
 	try {
 		//Create model and set parameters
 		cplex.setParam(IloCplex::Param::Threads, 1);
-		cplex.setParam(IloCplex::Param::TimeLimit, 7200);
+		cplex.setParam(IloCplex::Param::TimeLimit, 7200); 
 		cplex.setParam(IloCplex::Param::Preprocessing::Linear, 0);
 		cplex.setParam(IloCplex::Param::Preprocessing::Reduce, 0);
 		cplex.setParam(IloCplex::Param::Emphasis::Memory, 1);
 		cplex.setParam(IloCplex::Param::MIP::Strategy::File, 2);
 		cplex.setParam(IloCplex::Param::WorkMem, 100000);
-		if (!verbose) { cplex.setParam(IloCplex::Param::MIP::Display, 0); }
+		if (!verbose) { 
+			cplex.setParam(IloCplex::Param::MIP::Display, 0); 
+			cplex.setParam(IloCplex::Param::Tune::Display, 0);
+			cplex.setParam(IloCplex::Param::Simplex::Display, 0);
+			cplex.setParam(IloCplex::Param::Sifting::Display, 0);
+			cplex.setParam(IloCplex::Param::ParamDisplay, 0);
+			cplex.setParam(IloCplex::Param::Network::Display, 0);
+			cplex.setParam(IloCplex::Param::Conflict::Display, 0);
+		}
+		else { 
+			//cplex.setParam(IloCplex::Param::MIP::Display, 1);
+			cplex.setParam(IloCplex::Param::MIP::Interval, 10000);
+			cplex.setParam(IloCplex::Param::Tune::Display, 0);
+			cplex.setParam(IloCplex::Param::Simplex::Display, 0);
+			cplex.setParam(IloCplex::Param::Sifting::Display, 0);
+			cplex.setParam(IloCplex::Param::ParamDisplay, 0);
+			cplex.setParam(IloCplex::Param::Network::Display, 0);
+			cplex.setParam(IloCplex::Param::Conflict::Display, 0);
+		}
 
 		//Create variables
 		BoolVar3D x(env, T);
@@ -136,10 +170,6 @@ void Model_Multicut::Solve(multicuts _multicut, useHeuristic _heuristic, int _nG
 			}
 		}
 
-		BoolVar2D y(env, T);
-		for (int t = 0; t < T; t++) {
-			y[t] = IloBoolVarArray(env, M);
-		}
 
 		FloatVar2D theta(env, T);
 		for (int t = 0; t < T; t++) {
@@ -151,79 +181,49 @@ void Model_Multicut::Solve(multicuts _multicut, useHeuristic _heuristic, int _nG
 		////Budget, year 0
 		IloExpr budget0(env);
 		for (int j = 0; j < M; j++) {
-			IloExpr n_outlets(env);
 			for (int k = 1; k < Mj[j]; k++) {
-				n_outlets += k * x[0][j][k];
+				budget0 += (double)data.params["c"][0][j][k] * (x[0][j][k] - (int)data.params["x0"][j][k]);
 			}
-			budget0 += (data.params["c"][0][j]) * (n_outlets - data.params["x0"][j]);
-			budget0 += ((int)data.params["f"][0][j]) * (y[0][j] - (int)data.params["y0"][j]);
-			n_outlets.end();
 		}
-		model.add(budget0 <= (int)data.params["B"][0]);
+		model.add(budget0 <= (double)data.params["B"][0]);
 		budget0.end();
 
 		////Budget, year 1+
 		for (int t = 1; t < T; t++) {
 			IloExpr budget(env);
 			for (int j = 0; j < M; j++) {
-				IloExpr n_outlets(env);
 				for (int k = 1; k < Mj[j]; k++) {
-					n_outlets += k * (x[t][j][k] - x[t - 1][j][k]);
+					budget += (double)data.params["c"][t][j][k] * (x[t][j][k] - x[t-1][j][k]);
 				}
-				budget += ((int)data.params["c"][t][j]) * (n_outlets);
-
-				budget += ((int)data.params["f"][t][j]) * (y[t][j] - y[t - 1][j]);
-				n_outlets.end();
 			}
-			model.add(budget <= (int)data.params["B"][t]);
+			model.add(budget <= (double)data.params["B"][t]);
 			budget.end();
 		}
 
 		////Can't remove outlets, year 0
 		for (int j = 0; j < M; j++) {
-			IloExpr KeepX(env);
-			int mj = data.params["Mj"][j];
-			for (int k = 1; k < mj; k++) {
-				KeepX += k * x[0][j][k];
+			for (int k = 1; k < Mj[j]; k++) {
+				model.add(x[0][j][k] >= (int)data.params["x0"][j][k]);
 			}
-			model.add(KeepX >= (int)data.params["x0"][j]);
-			KeepX.end();
 		}
 
 		////Can't remove outlets, year 1+
 		for (int t = 1; t < T; t++) {
 			for (int j = 0; j < M; j++) {
-				IloExpr KeepXt1(env);
-				IloExpr KeepXt2(env);
 				for (int k = 1; k < Mj[j]; k++) {
-					KeepXt1 += k * x[t][j][k];
-					KeepXt2 += k * x[t - 1][j][k];
+					model.add(x[t][j][k] >= x[t-1][j][k]);
 				}
-				model.add(KeepXt1 >= KeepXt2);
-				KeepXt1.end();
-				KeepXt2.end();
 			}
 		}
 
-		////Can't close stations, year 0+
-		for (int j = 0; j < M; j++) {
-			model.add(y[0][j] >= (int)data.params["y0"][j]);
-			for (int t = 1; t < T; t++) {
-				model.add(y[t][j] >= y[t - 1][j]);
-			}
-		}
-
-		////Pay one-time cost
+		////At least k outlets, year 0+
 		for (int t = 0; t < T; t++) {
 			for (int j = 0; j < M; j++) {
-				IloExpr open(env);
 				for (int k = 1; k < Mj[j]; k++) {
-					open += x[t][j][k];
+					model.add(x[t][j][k] <= x[t][j][k - 1]);
 				}
-				model.add(open == y[t][j]);
 			}
 		}
-
 
 		///Redundant, but prevents crash from unextracted variables
 		for (int t = 0; t < T; t++) {
@@ -245,6 +245,14 @@ void Model_Multicut::Solve(multicuts _multicut, useHeuristic _heuristic, int _nG
 			G.SetData(data);
 			G.Solve();
 			sol = G.Solution;
+			//for (int t = 0; t < T; t++) {
+			//	vector<int> sol1;
+			//	for (int j = 0; j < M; j++) {
+			//		if (G.Solution[t][j] >= j) { sol1.push_back(1); }
+			//		else { sol1.push_back(0); }
+			//	}
+			//	sol.push_back(sol1);
+			//}
 			}
 		}
 		else {
@@ -276,7 +284,7 @@ void Model_Multicut::Solve(multicuts _multicut, useHeuristic _heuristic, int _nG
 
 
 			//Objective
-			if (verbose) { cout << "Adding objective \n"; }
+			if (verbose) { cplex.out() << "Adding objective \n"; }
 			IloExpr obj(env);
 			obj += theta[0][0];
 			model.add(IloMaximize(env, obj));
@@ -284,13 +292,9 @@ void Model_Multicut::Solve(multicuts _multicut, useHeuristic _heuristic, int _nG
 
 			for (int t = 0; t < T; t++) {
 				for (int j = 0; j < M; j++) {
-					startVar.add(y[t][j]);
-					int val = 0;
-					if (sol[t][j] > 0) { val = 1; }
-					startVal.add(val);
 					for (int k = 0; k < Mj[j]; k++) {
 						int val = 0;
-						if (sol[t][j] == k) {
+						if (sol[t][j] >= k) {
 							val = 1;
 						}
 						startVar.add(x[t][j][k]);
@@ -324,7 +328,7 @@ void Model_Multicut::Solve(multicuts _multicut, useHeuristic _heuristic, int _nG
 			}
 
 			//Objective
-			if (verbose) { cout << "Adding objective \n"; }
+			if (verbose) { cplex.out() << "Adding objective \n"; }
 			IloExpr obj(env);
 			for (int t = 0; t < T; t++) { obj += theta[t][0]; }
 			model.add(IloMaximize(env, obj));
@@ -333,13 +337,9 @@ void Model_Multicut::Solve(multicuts _multicut, useHeuristic _heuristic, int _nG
 			//Warmstart
 			for (int t = 0; t < T; t++) {
 				for (int j = 0; j < M; j++) {
-					startVar.add(y[t][j]);
-					int val = 0;
-					if (sol[t][j] > 0) { val = 1; }
-					startVal.add(val);
 					for (int k = 0; k < Mj[j]; k++) {
 						int val = 0;
-						if (sol[t][j] == k) {
+						if (sol[t][j] >= k) {
 							val = 1;
 						}
 						startVar.add(x[t][j][k]);
@@ -395,7 +395,7 @@ void Model_Multicut::Solve(multicuts _multicut, useHeuristic _heuristic, int _nG
 
 
 			//Objective
-			if (verbose) { cout << "Adding objective \n"; }
+			if (verbose) { cplex.out() << "Adding objective \n"; }
 			IloExpr obj(env);
 			for (int i = 0; i < N; i++) { obj += theta[0][i]; }
 			model.add(IloMaximize(env, obj));
@@ -404,13 +404,9 @@ void Model_Multicut::Solve(multicuts _multicut, useHeuristic _heuristic, int _nG
 			//Warmstart
 			for (int t = 0; t < T; t++) {
 				for (int j = 0; j < M; j++) {
-					startVar.add(y[t][j]);
-					int val = 0;
-					if (sol[t][j] > 0) { val = 1; }
-					startVal.add(val);
 					for (int k = 0; k < Mj[j]; k++) {
 						int val = 0;
-						if (sol[t][j] == k) {
+						if (sol[t][j] >= k) {
 							val = 1;
 						}
 						startVar.add(x[t][j][k]);
@@ -465,7 +461,7 @@ void Model_Multicut::Solve(multicuts _multicut, useHeuristic _heuristic, int _nG
 
 
 			//Objective
-			if (verbose) { cout << "Adding objective \n"; }
+			if (verbose) { cplex.out() << "Adding objective \n"; }
 			IloExpr obj(env);
 			for (int t = 0; t < T; t++) { 
 				for (int i = 0; i < N; i++) {
@@ -478,13 +474,9 @@ void Model_Multicut::Solve(multicuts _multicut, useHeuristic _heuristic, int _nG
 			//Warmstart
 			for (int t = 0; t < T; t++) {
 				for (int j = 0; j < M; j++) {
-					startVar.add(y[t][j]);
-					int val = 0;
-					if (sol[t][j] > 0) { val = 1; }
-					startVal.add(val);
 					for (int k = 0; k < Mj[j]; k++) {
 						int val = 0;
-						if (sol[t][j] == k) {
+						if (sol[t][j] >= k) {
 							val = 1;
 						}
 						startVar.add(x[t][j][k]);
@@ -527,7 +519,7 @@ void Model_Multicut::Solve(multicuts _multicut, useHeuristic _heuristic, int _nG
 
 		//Add GRASP cuts
 		if (nGRASP > 0) {
-			if (verbose) { cout << "Adding GRASP cuts" << endl; }
+			if (verbose) { cplex.out() << "Adding GRASP cuts" << endl; }
 			int success = 0;
 			int failure = 0;
 			for (int temp = 0; temp < nGRASP; temp++) {
@@ -544,16 +536,104 @@ void Model_Multicut::Solve(multicuts _multicut, useHeuristic _heuristic, int _nG
 		/////////////////////////////////////////////////////////////////////////
 
 		//Link callback
-		MulticutCallback cb(data, x, y, theta, multicut, heuristic);
-		cb.threshold = threshold;
+		MulticutCallback cb(data, x, theta, multicut, heuristic);
+		cb.threshold = overlap_threshold;
 		CPXLONG contextmask = IloCplex::Callback::Context::Id::Candidate
 			| IloCplex::Callback::Context::Id::Relaxation;
 		cplex.use(&cb, contextmask);
 
 
+		//Trust region
+		if (use_trust) {
+			IloConstraintArray trust(env);
+			IloNumVarArray delta(env);
+			for (int t = 0; t < T; t++) {
+				for (int j = 0; j < M; j++) {
+					for (int k = 1; k < Mj[j]; k++) {
+						IloNumVar delta_var(env);
+						delta.add(delta_var);
+						if (sol[t][j] >= k) {
+							IloConstraint cons = delta_var == 1 - x[t][j][k];
+							model.add(cons);
+							trust.add(cons);
+						}
+						else {
+							IloConstraint cons = delta_var == x[t][j][k];
+							model.add(cons);
+							trust.add(cons);
+						}
+					}
+				}
+			}
+			{
+				IloConstraint cons = IloSum(delta) <= trust_threshold;
+				model.add(cons);
+				trust.add(cons);
+			}
+			IloBool trust_solved = cplex.solve();
+			if (trust_solved) {
+				if (verbose) {
+					cplex.out() << "Solution status: " << cplex.getCplexStatus() << endl;
+					cplex.out() << "Optimal value: " << cplex.getObjValue() << endl;
+					cplex.out() << "Number of nodes: " << cplex.getNnodes() << endl;
+					cplex.out() << "Trust region solve time: " << cplex.getTime() << endl;
+				}
+				ObjectiveValue = cplex.getObjValue();
+				SolveTime = cplex.getTime();
+				TotalTime = time(NULL) - start;
+				OptimalityGap = cplex.getMIPRelativeGap();
+				GetSolution(cplex, x);
+				stats = cb.stats;
+				stats["nNodes"] = cplex.getNnodes();
+				stats["TrustSolveTime(DivideBy100)"] = (int) (100*cplex.getTime());
+			}
+			cplex.setParam(IloCplex::Param::TimeLimit, 7200 - cplex.getTime());
+			//for (int i = 0; i < trust.getSize(); i ++) {
+			//	model.remove(trust[i]);
+			//}
 
+			{
+				model.remove(trust[trust.getSize() - 1]);
+				IloConstraint cons = IloSum(delta) >= trust_threshold;
+				model.add(cons);
+				trust.add(cons);
+			}
 
-		if (verbose) { cout << "Model creation time: " << time(NULL) - start << " seconds" << endl; }
+			IloConstraint cons;
+			IloExpr obj(env);
+			switch (multicut)
+			{
+			case multicuts::SingleB1:
+			case multicuts::SingleB2:
+				cons = theta[0][0] >= ObjectiveValue;
+				model.add(cons);
+				break;
+			case multicuts::Multi1SB1:
+			case multicuts::Multi1B1:
+			case multicuts::Multi1B2:
+				for (int t = 0; t < T; t++) { obj += theta[t][0]; }
+				cons = obj >= ObjectiveValue;
+				model.add(cons);
+				break;
+			case multicuts::Multi2B1:
+			case multicuts::Multi2B2:
+				for (int i = 0; i < N; i++) { obj += theta[0][i]; }
+				cons = obj >= ObjectiveValue;
+				model.add(cons);
+				break;
+			case multicuts::Multi3SB2:
+			case multicuts::Multi3B1:
+			case multicuts::Multi3B2:
+				for (int t = 0; t < T; t++) { for (int i = 0; i < N; i++) { obj += theta[t][i]; } }
+				cons = obj >= ObjectiveValue;
+				model.add(cons);
+				break;
+			default:
+				break;
+			}
+		}
+
+		if (verbose) { cplex.out() << "Model creation time: " << time(NULL) - start << " seconds" << endl; }
 
 		//Solve and get results
 		IloBool solved = cplex.solve();
@@ -562,44 +642,41 @@ void Model_Multicut::Solve(multicuts _multicut, useHeuristic _heuristic, int _nG
 				cplex.out() << "Solution status: " << cplex.getCplexStatus() << endl;
 				cplex.out() << "Optimal value: " << cplex.getObjValue() << endl;
 				cplex.out() << "Number of nodes: " << cplex.getNnodes() << endl;
-				
+				cplex.out() << "\n" << endl;
 			}
-			stats = cb.stats;
-			stats["nNodes"] = cplex.getNnodes();
-
-
+			
+			if (use_trust) { 
+				for (pair<string, int> res : cb.stats) {
+					string category = res.first;
+					int value = res.second;
+					stats[category] = stats[category] + value;
+				}
+				stats["nNodes"] += cplex.getNnodes(); 
+			}
+			else { 
+				stats = cb.stats;
+				stats["nNodes"] = cplex.getNnodes(); 
+			}
 
 			ObjectiveValue = cplex.getObjValue();
 			SolveTime = cplex.getTime();
+			if (use_trust) {SolveTime += ((double)stats["TrustSolveTime(DivideBy100)"]) / 100;}
 			TotalTime = time(NULL) - start;
 			OptimalityGap = cplex.getMIPRelativeGap();
+			GetSolution(cplex, x);
 
-
-			for (int t = 0; t < T; t++) {
-				vector<int> Solution1;
-				for (int j = 0; j < M; j++) {
-					int total = 0;
-					for (int k = 1; k < Mj[j]; k++) {
-						if (cplex.getValue(x[t][j][k]) > 1 - EPS) {
-							total = k;
-							break;
-						}
-					}
-					Solution1.push_back(total);
-				}
-				Solution.push_back(Solution1);
-			}
 		}
-		else {
+		else if (!use_trust){
 			ObjectiveValue = -1;
 			SolveTime = -1;
 			OptimalityGap = -1;
 			stats = cb.stats;
 			stats["nNodes"] = cplex.getNnodes();
 		}
+
 	}
 	catch (IloException & e) {
-		cout << "Exception: " << e << endl;
+		cplex.out() << "Exception: " << e << endl;
 		ObjectiveValue = -1;
 		SolveTime = -1;
 		OptimalityGap = -1;
@@ -608,6 +685,27 @@ void Model_Multicut::Solve(multicuts _multicut, useHeuristic _heuristic, int _nG
 	cplex.end();
 	model.end();
 	env.end();
+	fout.close();
+
+}
+
+void Model_Multicut::GetSolution(IloCplex& cplex, BoolVar3D& x)
+{
+	vector<vector<int>> temp;
+	for (int t = 0; t < data.T; t++) {
+		vector<int> Solution1;
+		for (int j = 0; j < data.M; j++) {
+			int total = 0;
+			for (int k = 1; k < data.Mj[j]; k++) {
+				if (cplex.getValue(x[t][j][k]) > 1 - EPS) {
+					total = k;
+				}
+			}
+			Solution1.push_back(total);
+		}
+		temp.push_back(Solution1);
+	}
+	Solution = temp;
 }
 
 
@@ -692,7 +790,7 @@ bool Model_Multicut::GRASPCut(IloEnv& env, IloModel& model, BoolVar3D& x, IloArr
 
 			double maxVal = *max_element(StationTotals.begin(), StationTotals.end());
 			if (maxVal > 0) {
-				double threshold = 0.85 * maxVal;
+				double threshold = grasp_threshold * maxVal;
 				vector<int> candidates;
 				for (int j = 0; j < data.M; j++) {
 					if (StationTotals[j] >= threshold) { candidates.push_back(j);  }
