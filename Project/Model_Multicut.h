@@ -17,11 +17,11 @@ public:
 	void GetSolution(IloCplex& cplex, BoolVar3D& x);
 
 	//Storing information about solution
-	float ObjectiveValue;
-	float SolveTime;
-	float TotalTime;
+	float ObjectiveValue = -1;
+	float SolveTime = -1;
+	float TotalTime = -1;
 	vector<vector<int>> Solution;
-	float OptimalityGap;
+	double OptimalityGap = -1;
 
 	//Options
 	multicuts multicut = multicuts::Multi1B1;

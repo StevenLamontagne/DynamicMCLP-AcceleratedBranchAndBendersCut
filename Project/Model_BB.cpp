@@ -3,7 +3,7 @@
 
 
 ILOSTLBEGIN
-typedef IloArray<IloNumArray>    Float2D;
+typedef IloArray<IloNumArray>    Num2D;
 typedef IloArray<IloBoolVarArray> BoolVar2D;
 typedef IloArray<BoolVar2D> BoolVar3D;
 
@@ -166,11 +166,13 @@ void Model_BB::Solve()
 		ObjectiveValue = cplex.getObjValue();
 		SolveTime = cplex.getTime();
 		OptimalityGap = cplex.getMIPRelativeGap();
+		nNodes = cplex.getNnodes();
 	}
 	else {
 		ObjectiveValue = -1;
 		SolveTime = -1;
 		OptimalityGap = -1;
+		nNodes = -1;
 	}
 	}
 	catch (IloException & e) {

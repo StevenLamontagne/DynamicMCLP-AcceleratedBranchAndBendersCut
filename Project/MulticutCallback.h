@@ -9,11 +9,12 @@
 
 
 ILOSTLBEGIN
-typedef IloArray<IloNumArray>    Float2D;
+typedef IloArray<IloNumArray>    Num2D;
+typedef IloArray<IloArray<IloNumArray>> Num3D;
 typedef IloArray<IloNumVarArray>    NumVar2D;
+typedef IloArray<NumVar2D>    NumVar3D;
 typedef IloArray<IloBoolVarArray> BoolVar2D;
 typedef IloArray<BoolVar2D> BoolVar3D;
-typedef IloArray<IloArray<IloArray<IloNum>>> Num3D;
 typedef IloArray<IloArray<IloArray<IloInt>>> Int3D;
 
 
@@ -27,8 +28,10 @@ enum class multicuts :short int {
 	Multi3B1,
 	Multi3B2,
 	Multi1SB1,
-	Multi3SB2
-
+	Multi3SB2,
+	SinglePO1,
+	Multi1PO1,
+	Multi3PO1
 };
 
 enum class useHeuristic :char {
@@ -48,10 +51,13 @@ private:
 	//Data members
 	Data data;
 	BoolVar3D x;
-	NumVar2D theta; 
+	NumVar2D theta;
 	multicuts cut_type = multicuts::Multi1B1;
 	useHeuristic heuristic = useHeuristic::Warmstart;
 	double incumbent = 0.0;
+	vector<vector<vector<double>>> core_point;
+	double obj_val = -1.0;
+	int obj_counter = 0;
 
 	//Integer overflow is intended here
 	unsigned char PHcounter = 1;
@@ -79,8 +85,18 @@ private:
 
 
 public:
-	MulticutCallback(const Data& _data, const BoolVar3D& _x, const NumVar2D& _theta,multicuts _cut_type, useHeuristic _heuristic) :data(_data), x(_x), theta(_theta), cut_type(_cut_type), heuristic(_heuristic) {
-
+	MulticutCallback(const Data& _data, const BoolVar3D& _x, const NumVar2D& _theta, multicuts _cut_type, useHeuristic _heuristic) :data(_data), x(_x), theta(_theta), cut_type(_cut_type), heuristic(_heuristic) {
+		for (int t = 0; t < T; t++) {
+			vector<vector<double>> cp1;
+			for (int j = 0; j < M; j++) {
+				vector<double> cp2;
+				for (int k = 0; k < Mj[j]; k++) {
+					cp2.push_back(0);
+				}
+				cp1.push_back(cp2);
+			}
+			core_point.push_back(cp1);
+		}
 	};
 	virtual void invoke(const IloCplex::Callback::Context& context);
 	double threshold = 0.1;

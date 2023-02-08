@@ -14,9 +14,10 @@ public:
 	void SetData(const Data & newData) { data = newData; };
 	void Solve();
 
-	float ObjectiveValue;
-	float SolveTime;
-	float OptimalityGap;
+	float ObjectiveValue = -1;
+	float SolveTime = -1;
+	float OptimalityGap = -1;
+	int nNodes = 0;
 	vector<vector<int>> Solution;
 
 

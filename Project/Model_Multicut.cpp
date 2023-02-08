@@ -2,10 +2,11 @@
 #define EPS 1.0e-6
 
 ILOSTLBEGIN
-typedef IloArray<IloNumArray>    Float2D;
-typedef IloArray<IloNumVarArray>    FloatVar2D;
-typedef IloArray<IloBoolVarArray> BoolVar2D;
-typedef IloArray<BoolVar2D> BoolVar3D;
+//typedef IloArray<IloNumArray>    Num2D;
+//typedef IloArray<IloNumVarArray>    NumVar2D;
+//typedef IloArray<NumVar2D>    NumVar3D;
+//typedef IloArray<IloBoolVarArray> BoolVar2D;
+//typedef IloArray<BoolVar2D> BoolVar3D;
 
 
 void Model_Multicut::SetData(const Data& newData)
@@ -171,10 +172,12 @@ void Model_Multicut::Solve(json params)
 		}
 
 
-		FloatVar2D theta(env, T);
+		NumVar2D theta(env, T);
 		for (int t = 0; t < T; t++) {
-			theta[t] = IloNumVarArray(env, N, 0.0, IloInfinity);
+			theta[t] = IloNumVarArray(env, N, 0.0, IloInfinity); //NumVar initialisation requires the bounds, or accessing it will crash!
 		}
+
+		IloNumVar theta_obj(env);
 
 
 		//Constraints
@@ -234,6 +237,12 @@ void Model_Multicut::Solve(json params)
 			}
 		}
 
+
+		//Set objective via proxy. Cut methods define theta_obj via theta variables
+		model.add(IloMaximize(env, theta_obj));
+
+
+
 		
 		//Create warmstart solution (defaults to zero solution if not greedy)
 		IloNumVarArray startVar(env);
@@ -245,6 +254,7 @@ void Model_Multicut::Solve(json params)
 			G.SetData(data);
 			G.Solve();
 			sol = G.Solution;
+			ObjectiveValue = G.SolutionQuality;
 			//for (int t = 0; t < T; t++) {
 			//	vector<int> sol1;
 			//	for (int j = 0; j < M; j++) {
@@ -272,6 +282,7 @@ void Model_Multicut::Solve(json params)
 			///////////////////////////////////////////////////////////
 		case multicuts::SingleB1:
 		case multicuts::SingleB2:
+		case multicuts::SinglePO1:
 		{
 			////Upper bound for theta (ensures bounded problem)
 			IloNum ub = 0;
@@ -287,7 +298,7 @@ void Model_Multicut::Solve(json params)
 			if (verbose) { cplex.out() << "Adding objective \n"; }
 			IloExpr obj(env);
 			obj += theta[0][0];
-			model.add(IloMaximize(env, obj));
+			model.add(theta_obj == obj);
 			obj.end();
 
 			for (int t = 0; t < T; t++) {
@@ -316,6 +327,7 @@ void Model_Multicut::Solve(json params)
 		case multicuts::Multi1SB1:
 		case multicuts::Multi1B1:
 		case multicuts::Multi1B2:
+		case multicuts::Multi1PO1:
 		{
 			////Upper bound for theta (ensures bounded problem)
 
@@ -331,7 +343,7 @@ void Model_Multicut::Solve(json params)
 			if (verbose) { cplex.out() << "Adding objective \n"; }
 			IloExpr obj(env);
 			for (int t = 0; t < T; t++) { obj += theta[t][0]; }
-			model.add(IloMaximize(env, obj));
+			model.add(theta_obj == obj);
 			obj.end();
 
 			//Warmstart
@@ -398,7 +410,7 @@ void Model_Multicut::Solve(json params)
 			if (verbose) { cplex.out() << "Adding objective \n"; }
 			IloExpr obj(env);
 			for (int i = 0; i < N; i++) { obj += theta[0][i]; }
-			model.add(IloMaximize(env, obj));
+			model.add(theta_obj == obj);
 			obj.end();
 
 			//Warmstart
@@ -449,6 +461,7 @@ void Model_Multicut::Solve(json params)
 		case multicuts::Multi3SB2:
 		case multicuts::Multi3B1:
 		case multicuts::Multi3B2:
+		case multicuts::Multi3PO1:
 		{
 			////Upper bound for theta (ensures bounded problem)
 
@@ -468,7 +481,7 @@ void Model_Multicut::Solve(json params)
 					obj += theta[t][i];
 				}
 			}
-			model.add(IloMaximize(env, obj));
+			model.add(theta_obj == obj);
 			obj.end();
 
 			//Warmstart
@@ -513,6 +526,8 @@ void Model_Multicut::Solve(json params)
 		}
 		default:
 		{
+			cout << "You forgot to add the warmstart section for this option, dummy" << endl;
+			throw exception();
 			break;
 		}
 		}
@@ -543,33 +558,75 @@ void Model_Multicut::Solve(json params)
 		cplex.use(&cb, contextmask);
 
 
+		bool skip_solve = false;
 		//Trust region
 		if (use_trust) {
 			IloConstraintArray trust(env);
-			IloNumVarArray delta(env);
+
+			//Note: Trust distance definitions depend only on the warmstart solution, so never need to be updated
+			IloExpr trust_expr(env);
+			NumVar3D delta(env, T);
+			//Num3D I_tilde(env, T);
 			for (int t = 0; t < T; t++) {
+				delta[t] = NumVar2D(env, M);
+				//I_tilde[t] = Num2D(env, N);
 				for (int j = 0; j < M; j++) {
+					delta[t][j] = IloNumVarArray(env, Mj[j], 0.0, IloInfinity); //NumVar initialisation requires the bounds, or accessing it will crash!
 					for (int k = 1; k < Mj[j]; k++) {
-						IloNumVar delta_var(env);
-						delta.add(delta_var);
-						if (sol[t][j] >= k) {
-							IloConstraint cons = delta_var == 1 - x[t][j][k];
-							model.add(cons);
-							trust.add(cons);
-						}
-						else {
-							IloConstraint cons = delta_var == x[t][j][k];
-							model.add(cons);
-							trust.add(cons);
-						}
+						IloExpr expr(env);
+						expr -= delta[t][j][k];
+						for (int t_bar = 0; t_bar < t; t_bar++) { expr += delta[t_bar][j][k]; } //We add the previous delta variables to account for outlet preservation constraints
+						if (sol[t][j] >= k) { expr += 1 - x[t][j][k];	}
+						else { expr += x[t][j][k] ;}
+						model.add(expr == 0);
+						expr.end();
+						trust_expr += delta[t][j][k];
 					}
 				}
+
+				//for (int i = 0; i < N; i++) {
+				//	I_tilde[t][i] = IloNumArray(env, R[i]);
+				//	for (int r = 0; r < R[i]; r++) {
+				//		IloInt val = 0;
+				//		for (auto cover_triplet : data.cover_triplet[t][i][r]) {
+				//			int j = cover_triplet.first;
+				//			int k0 = cover_triplet.second;
+				//			if (sol[t][j] >= k0) { val += 1; }
+				//		}
+				//		I_tilde[t][i][r] = val;
+				//	}
+				//}
 			}
+
+
+			//for (int t = 0; t < T; t++) {
+			//	int temp = 0;
+			//	for (int j = 0; j < M; j++) {
+			//		if (sol[t][j] < 1) { continue; }
+			//		Num3D I_hat(env);
+			//		I_hat = I_tilde;
+			//		IloNum obj = ObjectiveValue;
+
+			//		for (int t2 = t; t2 < T; t2++) {
+			//			int current = sol[t2][j];
+			//			for (auto cover_station : data.cover_station[t2][j][current]) {
+			//				int i = cover_station.first;
+			//				int r = cover_station.second;
+			//				I_hat[t2][i][r] -= 1;
+			//			}
+			//			int temp = 0;
+			//		}
+			//		I_hat.end();
+			//	}
+			//}
+
 			{
-				IloConstraint cons = IloSum(delta) <= trust_threshold;
+				IloConstraint cons = trust_expr <= trust_threshold;
 				model.add(cons);
 				trust.add(cons);
+				//cons.end();
 			}
+
 			IloBool trust_solved = cplex.solve();
 			if (trust_solved) {
 				if (verbose) {
@@ -587,14 +644,18 @@ void Model_Multicut::Solve(json params)
 				stats["nNodes"] = cplex.getNnodes();
 				stats["TrustSolveTime(DivideBy100)"] = (int) (100*cplex.getTime());
 			}
-			cplex.setParam(IloCplex::Param::TimeLimit, 7200 - cplex.getTime());
+			//I_tilde.end();
+			IloNum timelimit = 7200 - cplex.getTime();
+			if (timelimit >EPS){ cplex.setParam(IloCplex::Param::TimeLimit, timelimit); }
+			else { skip_solve = true; }
 			//for (int i = 0; i < trust.getSize(); i ++) {
 			//	model.remove(trust[i]);
 			//}
-
+			cplex.clearUserCuts();
+			cplex.deleteMIPStarts(0, cplex.getNMIPStarts());
 			{
-				model.remove(trust[trust.getSize() - 1]);
-				IloConstraint cons = IloSum(delta) >= trust_threshold;
+				model.remove(trust);
+				IloConstraint cons = trust_expr >= trust_threshold + 1;
 				model.add(cons);
 				trust.add(cons);
 			}
@@ -603,14 +664,17 @@ void Model_Multicut::Solve(json params)
 			IloExpr obj(env);
 			switch (multicut)
 			{
+
 			case multicuts::SingleB1:
 			case multicuts::SingleB2:
+			case multicuts::SinglePO1:
 				cons = theta[0][0] >= ObjectiveValue;
 				model.add(cons);
 				break;
 			case multicuts::Multi1SB1:
 			case multicuts::Multi1B1:
 			case multicuts::Multi1B2:
+			case multicuts::Multi1PO1:
 				for (int t = 0; t < T; t++) { obj += theta[t][0]; }
 				cons = obj >= ObjectiveValue;
 				model.add(cons);
@@ -624,6 +688,7 @@ void Model_Multicut::Solve(json params)
 			case multicuts::Multi3SB2:
 			case multicuts::Multi3B1:
 			case multicuts::Multi3B2:
+			case multicuts::Multi3PO1:
 				for (int t = 0; t < T; t++) { for (int i = 0; i < N; i++) { obj += theta[t][i]; } }
 				cons = obj >= ObjectiveValue;
 				model.add(cons);
@@ -636,44 +701,45 @@ void Model_Multicut::Solve(json params)
 		if (verbose) { cplex.out() << "Model creation time: " << time(NULL) - start << " seconds" << endl; }
 
 		//Solve and get results
-		IloBool solved = cplex.solve();
-		if (solved) {
-			if (verbose) {
-				cplex.out() << "Solution status: " << cplex.getCplexStatus() << endl;
-				cplex.out() << "Optimal value: " << cplex.getObjValue() << endl;
-				cplex.out() << "Number of nodes: " << cplex.getNnodes() << endl;
-				cplex.out() << "\n" << endl;
-			}
-			
-			if (use_trust) { 
-				for (pair<string, int> res : cb.stats) {
-					string category = res.first;
-					int value = res.second;
-					stats[category] = stats[category] + value;
+		if (!skip_solve) {
+			IloBool solved = cplex.solve();
+			if (solved) {
+				if (verbose) {
+					cplex.out() << "Solution status: " << cplex.getCplexStatus() << endl;
+					cplex.out() << "Optimal value: " << cplex.getObjValue() << endl;
+					cplex.out() << "Number of nodes: " << cplex.getNnodes() << endl;
+					cplex.out() << "\n" << endl;
 				}
-				stats["nNodes"] += cplex.getNnodes(); 
+
+				if (use_trust) {
+					for (pair<string, int> res : cb.stats) {
+						string category = res.first;
+						int value = res.second;
+						stats[category] = stats[category] + value;
+					}
+					stats["nNodes"] += cplex.getNnodes();
+				}
+				else {
+					stats = cb.stats;
+					stats["nNodes"] = cplex.getNnodes();
+				}
+
+				ObjectiveValue = cplex.getObjValue();
+				SolveTime = cplex.getTime();
+				if (use_trust) { SolveTime += ((double)stats["TrustSolveTime(DivideBy100)"]) / 100; }
+				TotalTime = time(NULL) - start;
+				OptimalityGap = max((double)OptimalityGap, cplex.getMIPRelativeGap());
+				GetSolution(cplex, x);
+
 			}
-			else { 
+			else if (!use_trust) {
+				ObjectiveValue = -1;
+				SolveTime = -1;
+				OptimalityGap = -1;
 				stats = cb.stats;
-				stats["nNodes"] = cplex.getNnodes(); 
+				stats["nNodes"] = cplex.getNnodes();
 			}
-
-			ObjectiveValue = cplex.getObjValue();
-			SolveTime = cplex.getTime();
-			if (use_trust) {SolveTime += ((double)stats["TrustSolveTime(DivideBy100)"]) / 100;}
-			TotalTime = time(NULL) - start;
-			OptimalityGap = cplex.getMIPRelativeGap();
-			GetSolution(cplex, x);
-
 		}
-		else if (!use_trust){
-			ObjectiveValue = -1;
-			SolveTime = -1;
-			OptimalityGap = -1;
-			stats = cb.stats;
-			stats["nNodes"] = cplex.getNnodes();
-		}
-
 	}
 	catch (IloException & e) {
 		cplex.out() << "Exception: " << e << endl;

@@ -22,14 +22,13 @@
 using json = nlohmann::json;
 
 #include "Data.h"
-
 #include "Model_Multicut.h"
 #include "MulticutCallback.h"
-
-#include "Model_BB.h"
-
 #include "Greedy.h"
-
+//
+//#include "Data_Improved.h"
+//#include "Greedy_Improved.h"
+//#include "Model_Improved.h"
 
 template<typename ... Args>
 std::string string_format(const std::string& format, Args ... args)
@@ -49,7 +48,6 @@ double dot(_InIt1 const& vec1, _InIt2 const& vec2) {
 
 int main(int argc, char** argv) {
 
-    bool verbose = true;
     /*
     for (int i = 1; i < argc; ++i) {
         if (argv[i][0] == '-') {
@@ -86,11 +84,41 @@ int main(int argc, char** argv) {
     for (int test = 0; test < 1; test++) {
         time_t start;
         time(&start);
-        Data data;
 
-
-        data.load_compressed(basefile, string_format("MC%d_compressed.json", test), true);
+        Data_Improved data;
+        data.load(basefile, string_format("MC%d_compressed.json", test), true);
         std::cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
+
+        Greedy_Improved G;
+        G.SetData(data);
+        G.Solve(false);
+
+        std::cout << "Greedy solving time: " << G.SolveTime << " seconds" << endl;
+        std::cout << "Greedy solution quality: " << G.SolutionQuality << endl;
+
+
+        {
+        string label = "Model_Improved";
+        json params = { {"use_trust", true},  {"trust_threshold", 2}, { "verbose", true } };
+        Model_Improved mdl;
+        mdl.SetData(data);
+        cout << "Method: " << label << endl;
+        mdl.Solve(params);
+
+        }
+        //Data data;
+        //data.load_compressed(basefile, string_format("MC%d_compressed.json", test), true);
+        //std::cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
+
+        //{
+        //    string label = "Multi1B1_ImprovedTrust2";
+        //    json params = { {"multicut", multicuts::Multi1B1}, {"heuristic", useHeuristic::Warmstart}, {"use_trust", true},  {"trust_threshold", 2}, { "verbose", true } };
+        //    Model_Multicut mdl;
+        //    mdl.SetData(data);
+        //    cout << "Method: " << label << endl;
+        //    mdl.Solve(params);
+
+        //}
 
         //Model_BB mdl;
         //mdl.SetData(data);
@@ -104,17 +132,55 @@ int main(int argc, char** argv) {
         //    cout << "\n \n" << endl;
         //}
 
-        {
-            json params = { {"multicut", multicuts::SingleB1}, {"use_trust", true}, {"trust_threshold", 2.5 }, { "verbose", true } };
-            Model_Multicut mdl;
-            mdl.SetData(data);
-            mdl.Solve(params);
+        //{
+        //    json params = { {"multicut", multicuts::Multi3PO1}, {"heuristic", useHeuristic::Warmstart}, { "verbose", true } };
+        //    Model_Multicut mdl;
+        //    mdl.SetData(data);
+        //    mdl.Solve(params);
+        //    for (pair<string, int> res : mdl.stats) {
+        //        string category = res.first;
+        //        int value = res.second;
+        //        cout << category + ": " << value << endl;
+        //    }
+        //    
+        //}
+        //{
+        //    json params = { {"multicut", multicuts::Multi1B1}, {"heuristic", useHeuristic::Warmstart}, { "verbose", true } };
+        //    Model_Multicut mdl;
+        //    mdl.SetData(data);
+        //    mdl.Solve(params);
+        //    for (pair<string, int> res : mdl.stats) {
+        //        string category = res.first;
+        //        int value = res.second;
+        //        cout << category + ": " << value << endl;
+        //    }
 
-            std::ofstream f1("Test.json");
-            f1 << std::setw(3) << (json) mdl.stats;
-            f1.close();
-        }
+        //}
+        //{
+        //    json params = { {"multicut", multicuts::SinglePO1}, {"heuristic", useHeuristic::Warmstart}, { "verbose", true } };
+        //    Model_Multicut mdl;
+        //    mdl.SetData(data);
+        //    mdl.Solve(params);
+        //    for (pair<string, int> res : mdl.stats) {
+        //        string category = res.first;
+        //        int value = res.second;
+        //        cout << category + ": " << value << endl;
+        //    }
 
+        //}
+
+        //{
+        //    json params = { {"multicut", multicuts::Multi1PO1}, {"heuristic", useHeuristic::Warmstart}, { "verbose", true } };
+        //    Model_Multicut mdl;
+        //    mdl.SetData(data);
+        //    mdl.Solve(params);
+        //    for (pair<string, int> res : mdl.stats) {
+        //        string category = res.first;
+        //        int value = res.second;
+        //        cout << category + ": " << value << endl;
+        //    }
+
+        //}
         //{
         //    json params = { {"multicut", multicuts::Multi1B1}, {"use_trust", true}, {"trust_threshold", 5.0 }, { "verbose", true } };
         //    Model_Multicut mdl;
@@ -166,7 +232,7 @@ int main(int argc, char** argv) {
     std::string file;
     //vector<std::string> datasets = {"Price"}; //Start = 16
     //vector<std::string> datasets = { "Distance" };
-    vector<std::string> datasets = { "Simple" };
+    //vector<std::string> datasets = { "Simple" };
     //vector<std::string> datasets = {"LongSpan"};
 
     //for (auto dataset : datasets) {
@@ -235,7 +301,7 @@ int main(int argc, char** argv) {
     {
         cout << "Dataset: " << dataset << endl;
         std::string resultspath = "/local_1/outer/lamste/Results/TroisRivieres/C++/" + dataset + "/";
-        string prefix = "Trust";
+        string prefix = "CutTimes";
         std::string fp_times = resultspath + prefix + "_SolveTimes.json";
         std::string fp_gaps = resultspath + prefix + "_OptimalityGaps.json";
         std::string fp_objs = resultspath + prefix + "_ObjectiveValues.json";
@@ -280,22 +346,53 @@ int main(int argc, char** argv) {
         //    Results_stats = Results;
         //}
 
-
-
-        for (int test = 0; test < maxTest; test++) {
+        //for (int test = 0; test < maxTest; test++) {
+        for (int test = 0; test < 2; test++) {
             cout << "Test: " << test << endl;
             string folder = basefile + string_format("Test%d", test);
 
             time_t start;
             time(&start);
+            //Data_Improved data;
+            //data.load(basefile, string_format("MC%d_compressed.json", test), true);
             Data data;
             data.load_compressed(basefile, string_format("MC%d_compressed.json", test), true);
 
             cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
 
+            //{
+            //    string label = "B&C";
+            //    Model_BB mdl;
+            //    mdl.SetData(data);
+            //    cout << "Method: " << label << endl;
+            //    mdl.Solve();
+            //    Results_objs[label].push_back(mdl.ObjectiveValue);
+            //    Results_times[label].push_back(mdl.SolveTime);
+            //    Results_gaps[label].push_back(mdl.OptimalityGap);
+            //    Results_stats[label]["nNodes"].push_back(mdl.nNodes);
+            //}
+            //{
+            //    string label = "Eigen_Base";
+            //    json params = {{"use_trust", true},  {"trust_threshold", 2}, { "verbose", true } };
+            //    Model_Improved mdl;
+            //    mdl.SetData(data);
+            //    cout << "Method: " << label << endl;
+            //    mdl.Solve(params);
+            //    Results_objs[label].push_back(mdl.ObjectiveValue);
+            //    Results_times[label].push_back(mdl.SolveTime);
+            //    Results_gaps[label].push_back(mdl.OptimalityGap);
+            //    for (pair<string, int> res : mdl.stats) {
+            //        string category = res.first;
+            //        int value = res.second;
+            //        Results_stats[label][category].push_back(value);
+            //    }
+
+            //}
+
+
             {
-                string label = "SingleB1_Trust25";
-                json params = { {"multicut", multicuts::SingleB1}, {"use_trust", true}, , {"trust_threshold", 2.5},  { "verbose", true } };
+                string label = "MultiB1";
+                json params = { {"multicut", multicuts::Multi1B1}, {"heuristic", useHeuristic::Warmstart}, { "verbose", true } };
                 Model_Multicut mdl;
                 mdl.SetData(data);
                 cout << "Method: " << label << endl;
@@ -311,40 +408,171 @@ int main(int argc, char** argv) {
 
             }
 
-            {
-                string label = "SingleB1_Trust5";
-                json params = { {"multicut", multicuts::SingleB1}, {"use_trust", true}, , {"trust_threshold", 5},  { "verbose", true } };
-                Model_Multicut mdl;
-                mdl.SetData(data);
-                cout << "Method: " << label << endl;
-                mdl.Solve(params);
-                Results_objs[label].push_back(mdl.ObjectiveValue);
-                Results_times[label].push_back(mdl.SolveTime);
-                Results_gaps[label].push_back(mdl.OptimalityGap);
-                for (pair<string, int> res : mdl.stats) {
-                    string category = res.first;
-                    int value = res.second;
-                    Results_stats[label][category].push_back(value);
-                }
+            //{
+            //    string label = "Multi1B1_ImprovedTrust2";
+            //    json params = { {"multicut", multicuts::Multi1B1}, {"heuristic", useHeuristic::Warmstart}, {"use_trust", true},  {"trust_threshold", 2}, { "verbose", true } };
+            //    Model_Multicut mdl;
+            //    mdl.SetData(data);
+            //    cout << "Method: " << label << endl;
+            //    mdl.Solve(params);
+            //    Results_objs[label].push_back(mdl.ObjectiveValue);
+            //    Results_times[label].push_back(mdl.SolveTime);
+            //    Results_gaps[label].push_back(mdl.OptimalityGap);
+            //    for (pair<string, int> res : mdl.stats) {
+            //        string category = res.first;
+            //        int value = res.second;
+            //        Results_stats[label][category].push_back(value);
+            //    }
 
-            }
-            {
-                string label = "SingleB1_Trust10";
-                json params = { {"multicut", multicuts::SingleB1}, {"use_trust", true}, , {"trust_threshold", 10},  { "verbose", true } };
-                Model_Multicut mdl;
-                mdl.SetData(data);
-                cout << "Method: " << label << endl;
-                mdl.Solve(params);
-                Results_objs[label].push_back(mdl.ObjectiveValue);
-                Results_times[label].push_back(mdl.SolveTime);
-                Results_gaps[label].push_back(mdl.OptimalityGap);
-                for (pair<string, int> res : mdl.stats) {
-                    string category = res.first;
-                    int value = res.second;
-                    Results_stats[label][category].push_back(value);
-                }
+            //}
 
-            }
+            //{
+            //    string label = "SingleB1_Trust5";
+            //    json params = { {"multicut", multicuts::SingleB1}, {"heuristic", useHeuristic::Warmstart}, {"use_trust", true},  {"trust_threshold", 5}, { "verbose", true } };
+            //    Model_Multicut mdl;
+            //    mdl.SetData(data);
+            //    cout << "Method: " << label << endl;
+            //    mdl.Solve(params);
+            //    Results_objs[label].push_back(mdl.ObjectiveValue);
+            //    Results_times[label].push_back(mdl.SolveTime);
+            //    Results_gaps[label].push_back(mdl.OptimalityGap);
+            //    for (pair<string, int> res : mdl.stats) {
+            //        string category = res.first;
+            //        int value = res.second;
+            //        Results_stats[label][category].push_back(value);
+            //    }
+
+            //}
+
+
+            //{
+            //    string label = "SingleB1_Trust10";
+            //    json params = { {"multicut", multicuts::SingleB1}, {"heuristic", useHeuristic::Warmstart}, {"use_trust", true},  {"trust_threshold", 10}, { "verbose", true } };
+            //    Model_Multicut mdl;
+            //    mdl.SetData(data);
+            //    cout << "Method: " << label << endl;
+            //    mdl.Solve(params);
+            //    Results_objs[label].push_back(mdl.ObjectiveValue);
+            //    Results_times[label].push_back(mdl.SolveTime);
+            //    Results_gaps[label].push_back(mdl.OptimalityGap);
+            //    for (pair<string, int> res : mdl.stats) {
+            //        string category = res.first;
+            //        int value = res.second;
+            //        Results_stats[label][category].push_back(value);
+            //    }
+
+            //}
+
+
+            //if (test > 12) {
+            //    string label = "Multi1B1";
+            //    json params = { {"multicut", multicuts::Multi1B1}, { "verbose", true } };
+            //    Model_Multicut mdl;
+            //    mdl.SetData(data);
+            //    cout << "Method: " << label << endl;
+            //    mdl.Solve(params);
+            //    Results_objs[label].push_back(mdl.ObjectiveValue);
+            //    Results_times[label].push_back(mdl.SolveTime);
+            //    Results_gaps[label].push_back(mdl.OptimalityGap);
+            //    for (pair<string, int> res : mdl.stats) {
+            //        string category = res.first;
+            //        int value = res.second;
+            //        Results_stats[label][category].push_back(value);
+            //    }
+
+            //}
+
+            //if (test > 11) {
+            //    string label = "Multi1B2";
+            //    json params = { {"multicut", multicuts::Multi1B2}, { "verbose", true } };
+            //    Model_Multicut mdl;
+            //    mdl.SetData(data);
+            //    cout << "Method: " << label << endl;
+            //    mdl.Solve(params);
+            //    Results_objs[label].push_back(mdl.ObjectiveValue);
+            //    Results_times[label].push_back(mdl.SolveTime);
+            //    Results_gaps[label].push_back(mdl.OptimalityGap);
+            //    for (pair<string, int> res : mdl.stats) {
+            //        string category = res.first;
+            //        int value = res.second;
+            //        Results_stats[label][category].push_back(value);
+            //    }
+
+            //}
+
+            //{
+            //    string label = "Multi2B1";
+            //    json params = { {"multicut", multicuts::Multi2B1}, { "verbose", true } };
+            //    Model_Multicut mdl;
+            //    mdl.SetData(data);
+            //    cout << "Method: " << label << endl;
+            //    mdl.Solve(params);
+            //    Results_objs[label].push_back(mdl.ObjectiveValue);
+            //    Results_times[label].push_back(mdl.SolveTime);
+            //    Results_gaps[label].push_back(mdl.OptimalityGap);
+            //    for (pair<string, int> res : mdl.stats) {
+            //        string category = res.first;
+            //        int value = res.second;
+            //        Results_stats[label][category].push_back(value);
+            //    }
+
+            //}
+
+            //{
+            //    string label = "Multi2B2";
+            //    json params = { {"multicut", multicuts::Multi2B2}, { "verbose", true } };
+            //    Model_Multicut mdl;
+            //    mdl.SetData(data);
+            //    cout << "Method: " << label << endl;
+            //    mdl.Solve(params);
+            //    Results_objs[label].push_back(mdl.ObjectiveValue);
+            //    Results_times[label].push_back(mdl.SolveTime);
+            //    Results_gaps[label].push_back(mdl.OptimalityGap);
+            //    for (pair<string, int> res : mdl.stats) {
+            //        string category = res.first;
+            //        int value = res.second;
+            //        Results_stats[label][category].push_back(value);
+            //    }
+
+            //}
+
+            //{
+            //    string label = "Multi3B1";
+            //    json params = { {"multicut", multicuts::Multi3B1}, { "verbose", true } };
+            //    Model_Multicut mdl;
+            //    mdl.SetData(data);
+            //    cout << "Method: " << label << endl;
+            //    mdl.Solve(params);
+            //    Results_objs[label].push_back(mdl.ObjectiveValue);
+            //    Results_times[label].push_back(mdl.SolveTime);
+            //    Results_gaps[label].push_back(mdl.OptimalityGap);
+            //    for (pair<string, int> res : mdl.stats) {
+            //        string category = res.first;
+            //        int value = res.second;
+            //        Results_stats[label][category].push_back(value);
+            //    }
+
+            //}
+
+            //{
+            //    string label = "Multi3B2";
+            //    json params = { {"multicut", multicuts::Multi3B2}, { "verbose", true } };
+            //    Model_Multicut mdl;
+            //    mdl.SetData(data);
+            //    cout << "Method: " << label << endl;
+            //    mdl.Solve(params);
+            //    Results_objs[label].push_back(mdl.ObjectiveValue);
+            //    Results_times[label].push_back(mdl.SolveTime);
+            //    Results_gaps[label].push_back(mdl.OptimalityGap);
+            //    for (pair<string, int> res : mdl.stats) {
+            //        string category = res.first;
+            //        int value = res.second;
+            //        Results_stats[label][category].push_back(value);
+            //    }
+
+            //}
+
+
             //{
             //    string label = "SingleB2_Warmstart";
             //    json params = { {"multicut", multicuts::SingleB2}, {"heuristic", useHeuristic::Warmstart}, { "verbose", true } };

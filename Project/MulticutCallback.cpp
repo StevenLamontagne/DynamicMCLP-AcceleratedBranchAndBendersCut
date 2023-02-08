@@ -15,6 +15,10 @@ void MulticutCallback::invoke(const IloCplex::Callback::Context& context)
 	switch (context.getId()) {
 	case (IloCplex::Callback::Context::Id::Candidate):
 	{
+		double obj_new = context.getCandidateObjective();
+		if (obj_new == obj_val) { obj_counter += 1; }
+		else { obj_val = obj_new; obj_counter = 0; }
+		if (obj_counter >= 25) { context.abort(); }
 		//Get current solution value, x_tilde
 		for (int t = 0; t < T; t++) {
 			x_tilde[t] = IloArray<IloNumArray>(env, M);
@@ -35,6 +39,11 @@ void MulticutCallback::invoke(const IloCplex::Callback::Context& context)
 	}
 	case (IloCplex::Callback::Context::Id::Relaxation):
 	{
+		double obj_new = context.getRelaxationObjective();
+		if (obj_new == obj_val) { obj_counter += 1; }
+		else { obj_val = obj_new; obj_counter = 0; }
+		if (obj_counter >= 25) { context.abort(); }
+
 		//Get current solution value, x_tilde
 		IloArray<IloArray<IloNumArray>> x_tilde(env, T);
 		for (int t = 0; t < T; t++) {
@@ -82,9 +91,9 @@ void MulticutCallback::LazyCutCallback(const IloCplex::Callback::Context& contex
 	//Calculate I_tilde
 	Num3D I_tilde(env, T);
 	for (int t = 0; t < T; t++) {
-		I_tilde[t] = IloArray<IloArray<IloNum>>(env, N);
+		I_tilde[t] = Num2D(env, N);
 		for (int i = 0; i < N; i++) {
-			I_tilde[t][i] = IloArray<IloNum>(env, R[i]);
+			I_tilde[t][i] = IloNumArray(env, R[i]);
 			for (int r = 0; r < R[i]; r++) {
 				IloInt val = 0;
 				for (auto cover_triplet : data.cover_triplet[t][i][r]) {
@@ -114,9 +123,9 @@ void MulticutCallback::UserCutCallback(const IloCplex::Callback::Context& contex
 	//Calculate I_tilde
 	Num3D I_tilde(env, T);
 	for (int t = 0; t < T; t++) {
-		I_tilde[t] = IloArray<IloArray<IloNum>>(env, N);
+		I_tilde[t] = Num2D(env, N);
 		for (int i = 0; i < N; i++) {
-			I_tilde[t][i] = IloArray<IloNum>(env, R[i]);
+			I_tilde[t][i] = IloNumArray(env, R[i]);
 			for (int r = 0; r < R[i]; r++) {
 				IloNum val = 0;
 				for (int j = 0; j < M; j++) {
@@ -1491,6 +1500,244 @@ void MulticutCallback::AddCuts(const IloCplex::Callback::Context& context, const
 			}
 		}
 
+
+		break; //End of switch statement
+	}
+	///////////////////////////////////////////////////////////////////////////////
+	case multicuts::SinglePO1:
+	///////////////////////////////////////////////////////////////////////////////
+	{
+		for (int t = 0; t < T; t++) {
+			for (int j = 0; j < M; j++) {
+				for (int k = 0; k < Mj[j]; k++) {
+					core_point[t][j][k] = (core_point[t][j][k] + x_tilde[t][j][k]) / 2;
+				}
+			}
+		}
+
+		IloExpr lhs(env);
+		lhs -= theta[0][0];
+		IloNum covered = 0;
+		bool PO = false;
+
+		for (int t = 0; t < T; t++) {
+			for (int i = 0; i < N; i++) {
+				IloNum weight = (IloNum)data.params["Ni"][t][i] / (IloNum)R[i];
+				for (int r = 0; r < R[i]; r++) {
+					
+					if (data.P[t][i][r] == triplet::Uncoverable) { continue; }
+					else if (data.P[t][i][r] == triplet::Precovered) { covered += weight; }
+					else if (I_tilde[t][i][r] > 1) { covered += weight; }
+					else if (I_tilde[t][i][r] < 1) {
+						for (pair<int, int> cover_triplet : data.cover_triplet[t][i][r]) {
+							int j = cover_triplet.first;
+							int k0 = cover_triplet.second;
+							lhs += weight * x[t][j][k0];
+						}
+					}
+					else {
+						PO = true;
+						double I_c = 0;
+						for (auto cover_triplet : data.cover_triplet[t][i][r]) {
+							int j = cover_triplet.first;
+							int k0 = cover_triplet.second;
+							if (x_tilde[t][j][k0] > EPS) { I_c += x_tilde[t][j][k0]; }
+						}
+						if (I_c > 1) { covered += weight; }
+						else if (I_c< 1) {
+						for (pair<int, int> cover_triplet : data.cover_triplet[t][i][r]) {
+							int j = cover_triplet.first;
+							int k0 = cover_triplet.second;
+							lhs += weight * x[t][j][k0];
+							}
+						}
+						else if (data.P[t][i][r] == triplet::Single) {
+							int j = data.cover_triplet[t][i][r][0].first;
+							int k0 = data.cover_triplet[t][i][r][0].second;
+							lhs += weight * x[t][j][k0];
+						}
+						else { covered += weight; }
+					}
+
+				}
+			}
+		}
+		lhs += covered;
+		switch (context.getId()) {
+		case (IloCplex::Callback::Context::Id::Candidate):
+			if (context.getCandidateValue(lhs) < -EPS) {
+				if (PO) { stats["nParetoCuts"] += 1; }
+				context.rejectCandidate(lhs >= 0).end();
+			}
+			lhs.end();
+			break;
+		case (IloCplex::Callback::Context::Id::Relaxation):
+			if (context.getRelaxationValue(lhs) < -EPS) {
+				if (PO) { stats["nParetoCuts"] += 1; }
+				//context.addUserCut(lhs >= 0, IloCplex::UseCutPurge, IloFalse).end();
+				context.addUserCut(lhs >= 0, IloCplex::UseCutForce, IloFalse).end();
+			}
+			lhs.end();
+			break;
+		}
+		break; //End of switch statement
+	}
+	///////////////////////////////////////////////////////////////////////////////
+	case multicuts::Multi1PO1:
+		///////////////////////////////////////////////////////////////////////////////
+	{
+		for (int t = 0; t < T; t++) {
+			for (int j = 0; j < M; j++) {
+				for (int k = 0; k < Mj[j]; k++) {
+					core_point[t][j][k] = (core_point[t][j][k] + x_tilde[t][j][k]) / 2;
+				}
+			}
+		}
+
+		for (int t = 0; t < T; t++) {
+			IloExpr lhs(env);
+			lhs -= theta[t][0];
+			IloNum covered = 0;
+			bool PO = false;
+			for (int i = 0; i < N; i++) {
+				IloNum weight = (IloNum)data.params["Ni"][t][i] / (IloNum)R[i];
+				for (int r = 0; r < R[i]; r++) {
+
+					if (data.P[t][i][r] == triplet::Uncoverable) { continue; }
+					else if (data.P[t][i][r] == triplet::Precovered) { covered += weight; }
+					else if (I_tilde[t][i][r] > 1) { covered += weight; }
+					else if (I_tilde[t][i][r] < 1) {
+						for (pair<int, int> cover_triplet : data.cover_triplet[t][i][r]) {
+							int j = cover_triplet.first;
+							int k0 = cover_triplet.second;
+							lhs += weight * x[t][j][k0];
+						}
+					}
+					else {
+						PO = true;
+						double I_c = 0;
+						for (auto cover_triplet : data.cover_triplet[t][i][r]) {
+							int j = cover_triplet.first;
+							int k0 = cover_triplet.second;
+							if (x_tilde[t][j][k0] > EPS) { I_c += x_tilde[t][j][k0]; }
+						}
+						if (I_c > 1) { covered += weight; }
+						else if (I_c < 1) {
+							for (pair<int, int> cover_triplet : data.cover_triplet[t][i][r]) {
+								int j = cover_triplet.first;
+								int k0 = cover_triplet.second;
+								lhs += weight * x[t][j][k0];
+							}
+						}
+						else if (data.P[t][i][r] == triplet::Single) {
+							int j = data.cover_triplet[t][i][r][0].first;
+							int k0 = data.cover_triplet[t][i][r][0].second;
+							lhs += weight * x[t][j][k0];
+						}
+						else { covered += weight; }
+					}
+
+				}
+			}
+			lhs += covered;
+			switch (context.getId()) {
+			case (IloCplex::Callback::Context::Id::Candidate):
+				if (context.getCandidateValue(lhs) < -EPS) {
+					if (PO) { stats["nParetoCuts"] += 1; }
+					context.rejectCandidate(lhs >= 0).end();
+				}
+				lhs.end();
+				break;
+			case (IloCplex::Callback::Context::Id::Relaxation):
+				if (context.getRelaxationValue(lhs) < -EPS) {
+					if (PO) { stats["nParetoCuts"] += 1; }
+					//context.addUserCut(lhs >= 0, IloCplex::UseCutPurge, IloFalse).end();
+					context.addUserCut(lhs >= 0, IloCplex::UseCutForce, IloFalse).end();
+				}
+				lhs.end();
+				break;
+			}
+		}
+
+		break; //End of switch statement
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	case multicuts::Multi3PO1:
+		///////////////////////////////////////////////////////////////////////////////
+	{
+		for (int t = 0; t < T; t++) {
+			for (int j = 0; j < M; j++) {
+				for (int k = 0; k < Mj[j]; k++) {
+					core_point[t][j][k] = (core_point[t][j][k] + x_tilde[t][j][k]) / 2;
+				}
+			}
+		}
+
+		for (int t = 0; t < T; t++) {
+			for (int i = 0; i < N; i++) {
+				IloExpr lhs(env);
+				lhs -= theta[t][i];
+				IloNum covered = 0;
+				IloNum weight = (IloNum)data.params["Ni"][t][i] / (IloNum)R[i];
+				bool PO = false;
+				for (int r = 0; r < R[i]; r++) {
+					if (data.P[t][i][r] == triplet::Uncoverable) { continue; }
+					else if (data.P[t][i][r] == triplet::Precovered) { covered += weight; }
+					else if (I_tilde[t][i][r] > 1) { covered += weight; }
+					else if (I_tilde[t][i][r] < 1) {
+						for (pair<int, int> cover_triplet : data.cover_triplet[t][i][r]) {
+							int j = cover_triplet.first;
+							int k0 = cover_triplet.second;
+							lhs += weight * x[t][j][k0];
+						}
+					}
+					else {
+						PO = true;
+						double I_c = 0;
+						for (auto cover_triplet : data.cover_triplet[t][i][r]) {
+							int j = cover_triplet.first;
+							int k0 = cover_triplet.second;
+							if (x_tilde[t][j][k0] > EPS) { I_c += x_tilde[t][j][k0]; }
+						}
+						if (I_c > 1) { covered += weight; }
+						else if (I_c < 1) {
+							for (pair<int, int> cover_triplet : data.cover_triplet[t][i][r]) {
+								int j = cover_triplet.first;
+								int k0 = cover_triplet.second;
+								lhs += weight * x[t][j][k0];
+							}
+						}
+						else if (data.P[t][i][r] == triplet::Single) {
+							int j = data.cover_triplet[t][i][r][0].first;
+							int k0 = data.cover_triplet[t][i][r][0].second;
+							lhs += weight * x[t][j][k0];
+						}
+						else { covered += weight; }
+					}
+				}
+
+				lhs += covered;
+				switch (context.getId()) {
+				case (IloCplex::Callback::Context::Id::Candidate):
+					if (context.getCandidateValue(lhs) < -EPS) {
+						if (PO) { stats["nParetoCuts"] += 1; }
+						context.rejectCandidate(lhs >= 0).end();
+					}
+					lhs.end();
+					break;
+				case (IloCplex::Callback::Context::Id::Relaxation):
+					if (context.getRelaxationValue(lhs) < -EPS) {
+						if (PO) { stats["nParetoCuts"] += 1; }
+						//context.addUserCut(lhs >= 0, IloCplex::UseCutPurge, IloFalse).end();
+						context.addUserCut(lhs >= 0, IloCplex::UseCutForce, IloFalse).end();
+					}
+					lhs.end();
+					break;
+				}
+
+			}
+		}
 
 		break; //End of switch statement
 	}

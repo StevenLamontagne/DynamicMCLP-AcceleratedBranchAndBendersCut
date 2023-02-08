@@ -7,7 +7,7 @@
 #include "Data.h"
 
 ILOSTLBEGIN
-typedef IloArray<IloNumArray>    Float2D;
+typedef IloArray<IloNumArray>    Num2D;
 typedef IloArray<IloBoolVarArray> BoolVar2D;
 typedef IloArray<BoolVar2D> BoolVar3D;
 typedef IloArray<IloArray<IloArray<IloNum>>> Num3D;

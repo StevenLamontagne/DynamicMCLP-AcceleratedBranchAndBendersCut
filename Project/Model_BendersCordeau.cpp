@@ -2,7 +2,7 @@
 #define EPS 1.0e-6
 
 ILOSTLBEGIN
-typedef IloArray<IloNumArray>    Float2D;
+typedef IloArray<IloNumArray>    Num2D;
 typedef IloArray<IloBoolVarArray> BoolVar2D;
 typedef IloArray<BoolVar2D> BoolVar3D;
 
