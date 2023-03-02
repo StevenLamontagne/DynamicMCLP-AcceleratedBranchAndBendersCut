@@ -21,14 +21,15 @@
 
 using json = nlohmann::json;
 
-#include "Data.h"
-#include "Model_Multicut.h"
-#include "MulticutCallback.h"
-#include "Greedy.h"
+//#include "Data.h"
+//#include "Model_Multicut.h"
+//#include "MulticutCallback.h"
+//#include "Greedy.h"
 //
-//#include "Data_Improved.h"
-//#include "Greedy_Improved.h"
-//#include "Model_Improved.h"
+#include "Data_Improved.h"
+#include "Greedy_Improved.h"
+#include "Model_Improved.h"
+//#include "Model_LocalBranching.h"
 
 template<typename ... Args>
 std::string string_format(const std::string& format, Args ... args)
@@ -46,6 +47,24 @@ double dot(_InIt1 const& vec1, _InIt2 const& vec2) {
     return std::inner_product(std::begin(vec1), std::end(vec1), std::begin(vec2), 0.0); 
 }
 
+json ConvertMap(map<string, int> stats) {
+    json temp = stats;
+    json final;
+
+    vector<string> StatusConversion = { "Unknown", "Feasible", "Optimal", "Infeasible", "Unbounded", "InfeasibleOrUnbounded", "Error", "Bounded"};
+    final["Cplex status"] = StatusConversion[temp.value("CplexStatus", 0)];
+    final["Solve time (sec)"] = (double)temp.value("SolveTime (x100)", -1) / 100;
+    final["Objective value"] = (double)temp.value("ObjectiveValue (x100)", -1) / 100;
+    final["Optimality gap"] = (double)temp.value("OptimalityGap (x100)", -1) / 100;
+    final["Number of nodes"] = temp.value("nNodes", -1);
+    final["Number of lazy cuts"] = temp.value("nLazyCuts", -1);
+    final["Average lazy cut time (sec)"] = (double)temp.value("LazyCutTime (x1000)", -1) / 1000;
+    final["Number of user cuts"] = temp.value("nUserCuts", -1);
+    final["Average user cut time (sec)"] = (double)temp.value("UserCutTime (x1000)", -1) / 1000;
+
+    return final;
+}
+
 int main(int argc, char** argv) {
 
     /*
@@ -60,7 +79,7 @@ int main(int argc, char** argv) {
             file = argv[i];
     }
     */
-    
+
 
 
 
@@ -78,6 +97,14 @@ int main(int argc, char** argv) {
     //}
     //map <string, map<string, vector<int>>> stats = Stats;
 
+    json temp;
+    vector<string> doubles = { "Solve time (sec)" , "Objective value" , "Optimality gap" , "Average lazy cut time (sec)" , "Average user cut time (sec)" };
+    vector<string> ints = { "Number of nodes" , "Number of lazy cuts" , "Number of user cuts" };
+    vector<string> strings = { "Cplex status" };
+
+    for (string key : doubles) { temp[key] = vector<double>(); }
+    for (string key : ints) { temp[key] = vector<int>(); }
+    for (string key : strings) { temp[key] = vector<string>(); }
 
 
 
@@ -86,26 +113,54 @@ int main(int argc, char** argv) {
         time(&start);
 
         Data_Improved data;
-        data.load(basefile, string_format("MC%d_compressed.json", test), true);
+        data.load(basefile, string_format("MC%d_Simple.json", test), true);
         std::cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
 
-        Greedy_Improved G;
-        G.SetData(data);
-        G.Solve(false);
+        //Greedy_Improved G;
+        //G.SetData(data);
+        //G.Solve(false);
 
-        std::cout << "Greedy solving time: " << G.SolveTime << " seconds" << endl;
-        std::cout << "Greedy solution quality: " << G.SolutionQuality << endl;
+        //std::cout << "Greedy solving time: " << G.SolveTime << " seconds" << endl;
+        //std::cout << "Greedy solution quality: " << G.SolutionQuality << endl;
 
 
         {
-        string label = "Model_Improved";
-        json params = { {"use_trust", true},  {"trust_threshold", 2}, { "verbose", true } };
+        string label = "Multi1B1_RootFractionalCallback";
+        json params = {{ "verbose", true } };
         Model_Improved mdl;
         mdl.SetData(data);
         cout << "Method: " << label << endl;
         mdl.Solve(params);
+        cout << "Solution quality (model): " << mdl.ObjectiveValue << endl;
+        //for (pair<string, int> res : mdl.stats) {
+        //    string category = res.first;
+        //    int value = res.second;
+        //    cout << category + ": " << value << endl;
+        //}
+        json final = ConvertMap(mdl.stats);
+        for (auto& el : final.items())
+        {
+            temp[el.key()].push_back(el.value());
+            std::cout << el.key() << ": " << el.value() << '\n';
+        }
+        std::ofstream f1("Test.json");
+        f1 << std::setw(3) << temp << std::endl;
+        f1.close();
+
+
+        //cout << "Solution quality (data): " << data.SolutionQuality(mdl.Solution) << endl;
+        //std::ofstream f1("Solution.json");
+        //json sol = { {"Exact", mdl.Solution}};
+        //f1 << std::setw(3) << sol << std::endl;
+        //f1.close();
+
 
         }
+
+
+
+
+
         //Data data;
         //data.load_compressed(basefile, string_format("MC%d_compressed.json", test), true);
         //std::cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
@@ -301,7 +356,7 @@ int main(int argc, char** argv) {
     {
         cout << "Dataset: " << dataset << endl;
         std::string resultspath = "/local_1/outer/lamste/Results/TroisRivieres/C++/" + dataset + "/";
-        string prefix = "CutTimes";
+        string prefix = "Eigen";
         std::string fp_times = resultspath + prefix + "_SolveTimes.json";
         std::string fp_gaps = resultspath + prefix + "_OptimalityGaps.json";
         std::string fp_objs = resultspath + prefix + "_ObjectiveValues.json";
@@ -310,7 +365,7 @@ int main(int argc, char** argv) {
         
         std::string basefile = "/local_1/outer/lamste/Data/Precomputed/" + dataset + "/MaximumCover/";
 
-        map<string, vector<double>> Results_times;
+        //map<string, vector<double>> Results_times;
         //{
         //    json Results;
         //    std::ifstream f(fp_times, ifstream::in);
@@ -319,7 +374,8 @@ int main(int argc, char** argv) {
         //    f.close();
         //}
 
-        map<string, vector<double>> Results_objs;
+
+        //map<string, vector<double>> Results_objs;
         //{
         //    json Results;
         //    std::ifstream f(fp_objs, ifstream::in);
@@ -328,7 +384,8 @@ int main(int argc, char** argv) {
         //    f.close();
         //}
 
-        map<string, vector<double>> Results_gaps;
+
+        //map<string, vector<double>> Results_gaps;
         //{
         //    json Results;
         //    std::ifstream f(fp_gaps, ifstream::in);
@@ -337,7 +394,16 @@ int main(int argc, char** argv) {
         //    Results_gaps = Results;
         //}
 
-        map<string, map<string, vector<int>>> Results_stats;     
+
+        //map<string, map<string, vector<int>>> Results_stats;     
+        //{
+        //    json Results;
+        //    std::ifstream f(fp_stats, ifstream::in);
+        //    f >> Results;
+        //    f.close();
+        //    Results_stats = Results;
+        //}
+        json Results_stats;
         //{
         //    json Results;
         //    std::ifstream f(fp_stats, ifstream::in);
@@ -346,17 +412,27 @@ int main(int argc, char** argv) {
         //    Results_stats = Results;
         //}
 
-        //for (int test = 0; test < maxTest; test++) {
-        for (int test = 0; test < 2; test++) {
+        vector<string> doubles = { "Solve time (sec)" , "Objective value" , "Optimality gap" , "Average lazy cut time (sec)" , "Average user cut time (sec)" };
+        vector<string> ints = { "Number of nodes" , "Number of lazy cuts" , "Number of user cuts" };
+        vector<string> strings = { "Cplex status" };
+
+        for (string key : doubles) { Results_stats[key] = vector<double>(); }
+        for (string key : ints) { Results_stats[key] = vector<int>(); }
+        for (string key : strings) { Results_stats[key] = vector<string>(); }
+
+
+
+        for (int test = 0; test < maxTest; test++) {
+        //for (int test = 0; test < 2; test++) {
             cout << "Test: " << test << endl;
             string folder = basefile + string_format("Test%d", test);
 
             time_t start;
             time(&start);
-            //Data_Improved data;
-            //data.load(basefile, string_format("MC%d_compressed.json", test), true);
-            Data data;
-            data.load_compressed(basefile, string_format("MC%d_compressed.json", test), true);
+            Data_Improved data;
+            data.load(basefile, string_format("MC%d_compressed.json", test), true);
+            //Data data;
+            //data.load_compressed(basefile, string_format("MC%d_compressed.json", test), true);
 
             cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
 
@@ -371,10 +447,28 @@ int main(int argc, char** argv) {
             //    Results_gaps[label].push_back(mdl.OptimalityGap);
             //    Results_stats[label]["nNodes"].push_back(mdl.nNodes);
             //}
+            {
+                string label = "Eigen_FractionalRoot";
+                json params = { { "verbose", true } };
+                Model_Improved mdl;
+                mdl.SetData(data);
+                cout << "Method: " << label << endl;
+                mdl.Solve(params);
+                json final = ConvertMap(mdl.stats);
+                for (auto& el : final.items())
+                {
+                    Results_stats[el.key()].push_back(el.value());
+                }
+                cout << endl;
+
+            }
+
+
+
             //{
-            //    string label = "Eigen_Base";
-            //    json params = {{"use_trust", true},  {"trust_threshold", 2}, { "verbose", true } };
-            //    Model_Improved mdl;
+            //    string label = "MultiB1";
+            //    json params = { {"multicut", multicuts::Multi1B1}, {"heuristic", useHeuristic::Warmstart}, { "verbose", true } };
+            //    Model_Multicut mdl;
             //    mdl.SetData(data);
             //    cout << "Method: " << label << endl;
             //    mdl.Solve(params);
@@ -388,25 +482,6 @@ int main(int argc, char** argv) {
             //    }
 
             //}
-
-
-            {
-                string label = "MultiB1";
-                json params = { {"multicut", multicuts::Multi1B1}, {"heuristic", useHeuristic::Warmstart}, { "verbose", true } };
-                Model_Multicut mdl;
-                mdl.SetData(data);
-                cout << "Method: " << label << endl;
-                mdl.Solve(params);
-                Results_objs[label].push_back(mdl.ObjectiveValue);
-                Results_times[label].push_back(mdl.SolveTime);
-                Results_gaps[label].push_back(mdl.OptimalityGap);
-                for (pair<string, int> res : mdl.stats) {
-                    string category = res.first;
-                    int value = res.second;
-                    Results_stats[label][category].push_back(value);
-                }
-
-            }
 
             //{
             //    string label = "Multi1B1_ImprovedTrust2";
@@ -594,15 +669,15 @@ int main(int argc, char** argv) {
             cout << "\n" << endl;
 
             {
-                std::ofstream f1(fp_times);
-                f1 << std::setw(3) << (json) Results_times << std::endl;
-                f1.close();
-                std::ofstream f2(fp_objs);
-                f2 << std::setw(3) << (json) Results_objs << std::endl;
-                f2.close();
-                std::ofstream f3(fp_gaps);
-                f3 << std::setw(3) << (json) Results_gaps << std::endl;
-                f3.close();
+                //std::ofstream f1(fp_times);
+                //f1 << std::setw(3) << (json) Results_times << std::endl;
+                //f1.close();
+                //std::ofstream f2(fp_objs);
+                //f2 << std::setw(3) << (json) Results_objs << std::endl;
+                //f2.close();
+                //std::ofstream f3(fp_gaps);
+                //f3 << std::setw(3) << (json) Results_gaps << std::endl;
+                //f3.close();
                 std::ofstream f4(fp_stats);
                 f4 << std::setw(3) << (json) Results_stats << std::endl;
                 f4.close();

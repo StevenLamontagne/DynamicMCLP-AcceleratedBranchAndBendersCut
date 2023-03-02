@@ -31,9 +31,11 @@ private:
 	BoolVar2D x;
 	IloNumVarArray theta;
 	double incumbent = 0.0;
-	vector<vector<double>> core_point;
+	ArrayXXd core_point;
+	vector<VectorXd> core_coverage;
 	double obj_val = -1.0;
-	int obj_counter = 0;
+	short int duplicate_counter = 0;
+	double dual_val = 1.7e307;
 
 	//Define constants for easier reading and writing
 	int& T = data.T;
@@ -45,34 +47,30 @@ private:
 
 
 	//Functions for adding cuts
-	void LazyCutCallback(const IloCplex::Callback::Context& context, const Num2D& x_tilde);
-	void UserCutCallback(const IloCplex::Callback::Context& context, const Num2D& x_tilde);
-	void AddCuts(const IloCplex::Callback::Context& context, const Num2D& x_tilde, const vector<VectorXd>& I_tilde);
+	void LazyCutCallback(const IloCplex::Callback::Context& context, const ArrayXXd& x_tilde);
+	void UserCutCallback(const IloCplex::Callback::Context& context, const ArrayXXd& x_tilde);
+	void AddCuts(const IloCplex::Callback::Context& context, const ArrayXXd& x_tilde, const vector<VectorXd>& I_tilde);
 
 
 
 public:
-	Callback_Improved(const Data_Improved& _data, const BoolVar2D& _x, const IloNumVarArray& _theta) :data(_data), x(_x), theta(_theta) {
+	Callback_Improved(const Data_Improved& _data, const BoolVar2D& _x, const IloNumVarArray& _theta) :data(_data),  x(_x), theta(_theta) {
+		core_point = ArrayXXd::Constant(T, M_bar, 0.0);
 		for (int t = 0; t < T; t++) {
-			vector<double> cp1;
-			for (int j_bar = 0; j_bar < M_bar; j_bar++) {
-				cp1.push_back(0.0);
-			}
-			core_point.push_back(cp1);
+			VectorXd cover = VectorXd::Constant(P[t], 0.0);
+			core_coverage.push_back(cover);
 		}
 		for (int val : data.params["Mj"]) { Mj.push_back(val); }
-
+	
 	};
 
 	virtual void invoke(const IloCplex::Callback::Context& context);
 
-	map<string, int> stats = {
-		{"nOverlapCuts", 0},
-		{"nPostRepairs", 0},
-		{"nPostFills", 0},
-		{"nPostInfeasible", 0},
-		{"nLazyCuts", 0},
-		{"nUserCuts", 0}
-	};
+	map<string, int> stats = {};
+
+	void UpdateCorePoint(ArrayXXd x_new);
+
+	vector<double> LazyCutTimes;
+	vector<double> UserCutTimes;
 };
 

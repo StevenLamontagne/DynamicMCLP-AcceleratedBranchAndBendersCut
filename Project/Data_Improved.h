@@ -17,6 +17,7 @@
 using json = nlohmann::json;
 using Eigen::ArrayXXd;
 using Eigen::VectorXd;
+using Eigen::ArrayXd;
 using namespace std;
 
 typedef Eigen::SparseMatrix<double> SparseXXd;

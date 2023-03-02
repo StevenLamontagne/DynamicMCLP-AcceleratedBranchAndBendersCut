@@ -17,10 +17,10 @@ public:
 	void GetSolution(IloCplex& cplex, BoolVar2D& x);
 
 	//Storing information about solution
-	float ObjectiveValue = -1;
-	float SolveTime = -1;
-	float TotalTime = -1;
-	vector<vector<int>> Solution;
+	double ObjectiveValue = -1;
+	double SolveTime = -1;
+	double TotalTime = -1;
+	ArrayXXd Solution;
 	double OptimalityGap = -1;
 
 	//Options
@@ -38,9 +38,6 @@ public:
 
 private:
 	Data_Improved data;
-
-
-
 
 
 };

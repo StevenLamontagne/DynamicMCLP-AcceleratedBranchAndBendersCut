@@ -1,10 +1,29 @@
 {
-   "TrustSolveTime(DivideBy100)": 45,
-   "nLazyCuts": 14,
-   "nNodes": 59,
-   "nOverlapCuts": 0,
-   "nPostFills": 0,
-   "nPostInfeasible": 0,
-   "nPostRepairs": 0,
-   "nUserCuts": 204
+   "Average lazy cut time (sec)": [
+      0.0
+   ],
+   "Average user cut time (sec)": [
+      0.001
+   ],
+   "Cplex status": [
+      "Optimal"
+   ],
+   "Number of lazy cuts": [
+      22
+   ],
+   "Number of nodes": [
+      70
+   ],
+   "Number of user cuts": [
+      29
+   ],
+   "Objective value": [
+      32054.42
+   ],
+   "Optimality gap": [
+      0.0
+   ],
+   "Solve time (sec)": [
+      0.53
+   ]
 }
