@@ -40,7 +40,9 @@ void Data_Improved::load(string path, string file, bool verbose)
 
 }
 
-double Data_Improved::SolutionQuality(vector<vector<int>> Sol)
+
+
+double Data_Improved::SolutionQuality(const vector<vector<int>>& Sol)
 {
     double total = 0;
     for (int t = 0; t < T; t++) {
@@ -59,7 +61,42 @@ double Data_Improved::SolutionQuality(vector<vector<int>> Sol)
 }
 
 
+double Data_Improved::SolutionQuality(const ArrayXXd& Sol)
+{
+    double total = 0;
+    for (int t = 0; t < T; t++) {
+        VectorXd cover = VectorXd::Constant(P[t], 0.0);
+        for (int j_bar = 0; j_bar < M_bar; j_bar++) {
+            if (Sol(t,j_bar) > 1 - EPS) {
+                cover += a[t].col(j_bar);
+                total += Ps[t](j_bar);
+            }
+        }
+        total += weights[t].dot((VectorXd)(cover.array() >= 1).matrix().cast<double>());
+        total += Precovered[t];
+    }
+    return total;
+}
 
+
+double Data_Improved::SolutionQualityContinuous(const ArrayXXd& Sol)
+{
+    double total = 0;
+    for (int t = 0; t < T; t++) {
+        VectorXd cover = VectorXd::Constant(P[t], 0.0);
+        for (int j_bar = 0; j_bar < M_bar; j_bar++) {
+            if (Sol(t, j_bar) > EPS) {
+                cover += Sol(t, j_bar) * a[t].col(j_bar);
+                total += Sol(t, j_bar) * Ps[t](j_bar);
+            }
+        }
+        total += weights[t].dot((VectorXd)(cover.array() >= 1).matrix().cast<double>());
+        ArrayXd filter = (cover.array() < 1).cast<double>();
+        total += weights[t].dot((filter * cover.array()).matrix().cast<double>());
+        total += Precovered[t];
+    }
+    return total;
+}
 
 void Data_Improved::create_covering(string path, string file, bool verbose)
 {

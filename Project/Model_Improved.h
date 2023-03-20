@@ -15,6 +15,7 @@ public:
 	void Solve(json params);
 
 	void GetSolution(IloCplex& cplex, BoolVar2D& x);
+	vector<vector<int>> ConvertSolution();
 
 	//Storing information about solution
 	double ObjectiveValue = -1;
