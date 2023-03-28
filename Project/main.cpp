@@ -109,7 +109,7 @@ int main(int argc, char** argv) {
 
     time_t start;
     time(&start);
-    string file = "MC0_Price.json";
+    string file = "MC0_Home.json";
     Data_Improved data;
     data.load(basefile, file, true);
     std::cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
