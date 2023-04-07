@@ -13,7 +13,7 @@ void Data_Improved::load(string path, string file, bool verbose)
     {
         f >> params;
         T = (int)params["T"];
-        
+
 
         if (verbose) {
             cout << "File loading success \n";
@@ -50,9 +50,10 @@ double Data_Improved::SolutionQuality(const vector<vector<int>>& Sol)
         for (int j_bar = 0; j_bar < M_bar; j_bar++) {
             int j = params["station_coord"][j_bar][0];
             int k = params["station_coord"][j_bar][1];
-            if (Sol[t][j] >= k) { 
-                cover += a[t].col(j_bar); 
-                total += Ps[t](j_bar); }
+            if (Sol[t][j] >= k) {
+                cover += a[t].col(j_bar);
+                total += Ps[t](j_bar);
+            }
         }
         total += weights[t].dot((VectorXd)(cover.array() >= 1).matrix().cast<double>());
         total += Precovered[t];
@@ -67,7 +68,7 @@ double Data_Improved::SolutionQuality(const ArrayXXd& Sol)
     for (int t = 0; t < T; t++) {
         VectorXd cover = VectorXd::Constant(P[t], 0.0);
         for (int j_bar = 0; j_bar < M_bar; j_bar++) {
-            if (Sol(t,j_bar) > 1 - EPS) {
+            if (Sol(t, j_bar) > 1 - EPS) {
                 cover += a[t].col(j_bar);
                 total += Ps[t](j_bar);
             }
@@ -114,8 +115,8 @@ void Data_Improved::create_covering(string path, string file, bool verbose)
     f2 >> temp_coverage;
     f2.close();
 
-    M_bar = (int) params["station_coord"].size();
-    int P_est = (int) params["user_coord"].size();
+    M_bar = (int)params["station_coord"].size();
+    int P_est = (int)params["user_coord"].size();
     for (int t = 0; t < T; t++) {
         Ps.push_back(Eigen::VectorXd::Zero(M_bar));
         Precovered.push_back(0.0);
@@ -138,7 +139,7 @@ void Data_Improved::create_covering(string path, string file, bool verbose)
         }
 
         for (vector<int> coord : temp_coverage["a"][t]) {
-            temp_a(coord[0],coord[1]) = 1;
+            temp_a(coord[0], coord[1]) = 1;
         }
 
 
@@ -189,8 +190,8 @@ void Data_Improved::create_covering(string path, string file, bool verbose)
             }
             }
         }
-        
-        P.push_back((int) temp_weight.size());
+
+        P.push_back((int)temp_weight.size());
         Eigen::VectorXd convert = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(temp_weight.data(), temp_weight.size());
         weights.push_back(convert);
 

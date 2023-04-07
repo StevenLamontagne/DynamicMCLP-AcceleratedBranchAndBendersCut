@@ -35,6 +35,7 @@ void Model_LocalBranching::Solve(json params)
 	use_trust = params.value("use_trust", false);
 	bool use_trust_cuts = params.value("use_trust_cuts", false);
 	trust_threshold = params.value("trust_threshold", 2.0);
+	int nTrust = 1024;
 
 	//string outfile = params.value("outfile", "");
 	//ofstream fout(outfile);
@@ -80,13 +81,16 @@ void Model_LocalBranching::Solve(json params)
 		cplex.setParam(IloCplex::Param::WorkMem, 100000);
 
 		cplex.setParam(IloCplex::Param::Preprocessing::Reformulations, 2);
-		cplex.setParam(IloCplex::Param::Preprocessing::Reduce, 2);
+		cplex.setParam(IloCplex::Param::Preprocessing::Reduce, 1);
+
+		//cplex.setParam(IloCplex::Param::Emphasis::MIP, 2);
 		//cplex.setParam(IloCplex::Param::Preprocessing::Presolve, 0);
 		//cplex.setParam(IloCplex::Param::Emphasis::MIP, 0);
-
-		cplex.setParam(IloCplex::Param::MIP::Display, 1);
-		cplex.setParam(IloCplex::Param::MIP::Interval, 10000);
-		cplex.setParam(IloCplex::Param::Simplex::Display, 0);
+		cplex.setParam(IloCplex::Param::ParamDisplay, 1);
+		cplex.setParam(IloCplex::Param::Read::WarningLimit, 0);
+		cplex.setParam(IloCplex::Param::MIP::Display, 2);
+		cplex.setParam(IloCplex::Param::MIP::Interval, 100);
+		cplex.setParam(IloCplex::Param::Simplex::Display, 2);
 		
 
 		//Create variables
@@ -99,8 +103,8 @@ void Model_LocalBranching::Solve(json params)
 
 		IloNumVar theta_obj(env);
 
-		BoolVar2D trust(env, 1024);
-		for (int i = 0; i < 1024; i++) {
+		BoolVar2D trust(env, nTrust);
+		for (int i = 0; i < nTrust; i++) {
 			trust[i] = IloBoolVarArray(env, T);
 		}
 
@@ -160,59 +164,72 @@ void Model_LocalBranching::Solve(json params)
 			}
 			model.add(theta[t] >= 0);
 
-			for (int i = 0; i < 1024; i++) {
+			for (auto i = 0; i < trust.getSize(); i++) {
 				model.add(trust[i][t] >= 0);
 			}
 		}
 
 
-		//Create warmstart solution (greedy)
-		IloNumVarArray startVar(env);
-		IloNumArray startVal(env);
-		vector<vector<int>> sol;
-		Greedy_Improved G;
-		G.SetData(data);
-		G.Solve(false);
-		sol = G.Solution;
-		ObjectiveValue = G.SolutionQuality;
+		//{
+		//	//Create warmstart solution (greedy)
+		//	IloNumVarArray startVar(env);
+		//	IloNumArray startVal(env);
+		//	vector<vector<int>> sol;
+		//	Greedy_Improved G;
+		//	G.SetData(data);
+		//	G.Solve(false);
+		//	sol = G.Solution;
 
-		for (int t = 0; t < T; t++) {
-			for (int j_bar = 0; j_bar < M_bar; j_bar++) {
-				int j = data.params["station_coord"][j_bar][0];
-				int k = data.params["station_coord"][j_bar][1];
-				int val = 0;
-				if (sol[t][j] >= k) {
-					val = 1;
-				}
-				startVar.add(x[t][j_bar]);
-				startVal.add(val);
-				Solution(t, j_bar) = val;
-			}
+		//	for (int t = 0; t < T; t++) {
+		//		for (int j_bar = 0; j_bar < M_bar; j_bar++) {
+		//			int j = data.params["station_coord"][j_bar][0];
+		//			int k = data.params["station_coord"][j_bar][1];
+		//			int val = 0;
+		//			if (sol[t][j] >= k) {
+		//				val = 1;
+		//			}
+		//			startVar.add(x[t][j_bar]);
+		//			startVal.add(val);
+		//			Solution(t, j_bar) = val;
+		//		}
 
-			startVar.add(theta[t]);
-			IloNum val = 0;
-			VectorXd I_tilde = VectorXd::Constant(P[t], 0.0);
-			for (int j_bar = 0; j_bar < M_bar; j_bar++) {
-				int j = data.params["station_coord"][j_bar][0];
-				int k = data.params["station_coord"][j_bar][1];
-				if (sol[t][j] >= k) {
-					I_tilde += data.a[t].col(j_bar);
-				}
-			}
-			val += data.weights[t].dot((VectorXd)(I_tilde.array() >= 1).matrix().cast<double>());
-			startVal.add(val);
-		}
+		//		for (int i = 0; i < 1024; i++) {
+		//			startVar.add(trust[i][t]);
+		//			startVal.add(0.0);
+		//		}
+		//		startVar.add(theta[t]);
+		//		IloNum val = 0;
+		//		VectorXd I_tilde = VectorXd::Constant(P[t], 0.0);
+		//		for (int j_bar = 0; j_bar < M_bar; j_bar++) {
+		//			int j = data.params["station_coord"][j_bar][0];
+		//			int k = data.params["station_coord"][j_bar][1];
+		//			if (sol[t][j] >= k) {
+		//				I_tilde += data.a[t].col(j_bar);
+		//			}
+		//		}
+		//		val += data.weights[t].dot((VectorXd)(I_tilde.array() >= 1).matrix().cast<double>());
+		//		startVal.add(val);
+		//	}
+		//	startVar.add(theta_obj);
+		//	startVal.add(G.SolutionQuality);
+		//	cplex.addMIPStart(startVar, startVal);
+		//	startVal.end();
+		//	startVar.end();
+		//}
 
 
-		cplex.addMIPStart(startVar, startVal);
-		startVal.end();
-		startVar.end();
+
 
 
 
 		////Upper bound for theta (ensures bounded problem)
 		for (int t = 0; t < T; t++) {
 			model.add(theta[t] <= data.weights[t].sum());
+		}
+
+		////Ensures trust cut big-Ms work correctly
+		for (auto i = 0; i < trust.getSize(); i++) {
+			model.add(IloSum(trust[i]) <= T - 1);
 		}
 
 
@@ -231,21 +248,43 @@ void Model_LocalBranching::Solve(json params)
 		//Set objective via proxy
 		model.add(IloMaximize(env, theta_obj));
 
+		//Calculate solution of LP relaxation and add associated fractional Bender's cuts to model
+		{
+			vector<IloConversion> conv_x;
+			for (int t = 0; t < T; t++) {
+					IloConversion conv(env, x[t], IloNumVar::Type::Float);
+					model.add(conv);
+					conv_x.push_back(conv);
+			}
+
+			Callback_Improved cb(data, x, theta);
+			CPXLONG contextmask = IloCplex::Callback::Context::Id::Relaxation;
+			cplex.use(&cb, contextmask);
+			cplex.solve();
+
+			for (auto conv : conv_x) {
+				model.remove(conv);
+			}
+		}
+
 
 		//Link callback
-		Callback_LocalBranching cb(data, model, x, theta, trust); 
+		Callback_LocalBranching cb(data, model, x, theta, theta_obj, trust); 
 		CPXLONG contextmask = IloCplex::Callback::Context::Id::Candidate
-			| IloCplex::Callback::Context::Id::Relaxation;
+		| IloCplex::Callback::Context::Id::Relaxation;
+		//	| IloCplex::Callback::Context::Id::Branching;
 		cplex.use(&cb, contextmask);
-
+		cb.SetSolution(Solution);
+		cb.status = CallbackStatus::Feasible;
 
 		////////////////////////////////////////////////////////////////////////////////////////////
 		//Solve and get results
 		bool solved = cplex.solve();
+		cplex.out() << endl;
 		if (verbose) {
 			cplex.out() << "Solution status: " << cplex.getCplexStatus() << endl;
 			cplex.out() << "Optimal value: " << cb.GetSolutionObjective() << endl;
-			//cplex.out() << "Number of nodes: " << cplex.getNnodes() << endl;
+			cplex.out() << "Number of nodes: " << cplex.getNnodes() << endl;
 			cplex.out() << "\n" << endl;
 		}
 
@@ -254,12 +293,12 @@ void Model_LocalBranching::Solve(json params)
 			int value = res.second;
 			stats[category] += value;
 		}
-		//stats["nNodes"] += (int)cplex.getNnodes();
-		IloAlgorithm::Status status = cplex.getStatus();
-		stats["CplexStatus"] = status;
+		stats["nNodes"] += (int)cplex.getNnodes();
+		stats["CplexStatus"] = (int) cb.status;
 		stats["SolveTime (x100)"] = (int)100 * cplex.getTime();
 		stats["ObjectiveValue (x100)"] = (int)100 * cb.GetSolutionObjective();
-		//stats["OptimalityGap (x100)"] = (int)10000 * cplex.getMIPRelativeGap();
+		//stats["OptimalityGap (x100)"] = (int)10000 * cb.GetOptimalityGap();
+		stats["OptimalityGap (x100)"] = (int)10000 * cplex.getMIPRelativeGap();
 
 		if (cb.LazyCutTimes.size() > 0) {
 			stats["LazyCutTime (x1000)"] = 1000 * Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(cb.LazyCutTimes.data(), cb.LazyCutTimes.size()).mean();
@@ -278,9 +317,9 @@ void Model_LocalBranching::Solve(json params)
 		SolveTime = -1;
 		OptimalityGap = -1;
 	}
-	cplex.clearUserCuts();
-	cplex.end();
-	model.end();
+	//cplex.clearUserCuts();
+	//cplex.end();
+	//model.end();
 	env.end();
 	//fout.close();
 

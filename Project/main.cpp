@@ -28,7 +28,7 @@ using json = nlohmann::json;
 //
 #include "Data_Improved.h"
 #include "Greedy_Improved.h"
-#include "Model_Improved.h"
+//#include "Model_Improved.h"
 #include "Model_LocalBranching.h"
 
 template<typename ... Args>
@@ -109,7 +109,7 @@ int main(int argc, char** argv) {
 
     time_t start;
     time(&start);
-    string file = "MC0_Price.json";
+    string file = "MC0_Home.json";
     Data_Improved data;
     data.load(basefile, file, true);
     std::cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
@@ -226,10 +226,10 @@ int main(int argc, char** argv) {
     {
         cout << "Dataset: " << dataset << endl;
         std::string resultspath = "/local_1/outer/lamste/Results/TroisRivieres/C++/" + dataset + "/";
-        string prefix = "QuickTrust";
-        std::string fp_times = resultspath + prefix + "_SolveTimes.json";
-        std::string fp_gaps = resultspath + prefix + "_OptimalityGaps.json";
-        std::string fp_objs = resultspath + prefix + "_ObjectiveValues.json";
+        string prefix = "LocalBranching";
+        //std::string fp_times = resultspath + prefix + "_SolveTimes.json";
+        //std::string fp_gaps = resultspath + prefix + "_OptimalityGaps.json";
+        //std::string fp_objs = resultspath + prefix + "_ObjectiveValues.json";
         std::string fp_stats = resultspath + prefix + "_Statistics.json";
 
         
@@ -274,27 +274,27 @@ int main(int argc, char** argv) {
         //    Results_stats = Results;
         //}
         json Results_stats;
-        {
-            json Results;
-            std::ifstream f(fp_stats, ifstream::in);
-            f >> Results;
-            f.close();
-            Results_stats = Results;
-        }
+        //{
+        //    json Results;
+        //    std::ifstream f(fp_stats, ifstream::in);
+        //    f >> Results;
+        //    f.close();
+        //    Results_stats = Results;
+        //}
 
         vector<string> doubles = { "Solve time (sec)" , "Objective value" , "Optimality gap (%)" , "Average lazy cut time (sec)" , "Average user cut time (sec)" };
         vector<string> ints = { "Number of nodes" , "Number of lazy cuts" , "Number of user cuts" };
         vector<string> strings = { "Cplex status" };
-        vector<string> labels = { "Multi1PO1+Distance4" };
+        vector<string> labels = { "LocalBranching" };
 
 
         for (string label : labels) {
+            if (Results_stats.contains(label)){ continue; }
             Results_stats[label] = {};
             for (string key : doubles) { Results_stats[label][key] = vector<double>(); }
             for (string key : ints) { Results_stats[label][key] = vector<int>(); }
             for (string key : strings) { Results_stats[label][key] = vector<string>(); }
         }
-
 
 
         for (int test = 0; test < maxTest; test++) {
@@ -323,11 +323,11 @@ int main(int argc, char** argv) {
             //    Results_stats[label]["nNodes"].push_back(mdl.nNodes);
             //}
             {
-                string label = "Multi1PO1+Distance4";
+                string label = "LocalBranching";
                 if (!(Results_stats.contains(label))) { throw std::runtime_error("Label missing from JSON. Add label to labels vector."); }
                 if (Results_stats[label]["Cplex status"].size() > (long unsigned int) test) { throw std::runtime_error("Results already populated. Check the label is spelled correctly or disable this error."); }
                 json params = { { "verbose", true } };
-                Model_Improved mdl;
+                Model_LocalBranching mdl;
                 mdl.SetData(data);
                 cout << "Method: " << label << endl;
                 mdl.Solve(params);
@@ -339,7 +339,6 @@ int main(int argc, char** argv) {
                 cout << endl;
 
             }
-
 
 
             //{
