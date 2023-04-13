@@ -53,7 +53,8 @@ json ConvertMap(map<string, int> stats) {
 
     vector<string> StatusConversion = { "Unknown", "Feasible", "Optimal", "Infeasible", "Unbounded", "InfeasibleOrUnbounded", "Error", "Bounded"};
     final["Cplex status"] = StatusConversion[temp.value("CplexStatus", 0)];
-    final["Solve time (sec)"] = (double)temp.value("SolveTime (x100)", -1) / 100;
+    final["Solve time, LP (sec)"] = (double)temp.value("Solve time, LP (x100)", -1) / 100;
+    final["Solve time, MIP (sec)"] = (double)temp.value("Solve time, MIP (x100)", -1) / 100;
     final["Objective value"] = (double)temp.value("ObjectiveValue (x100)", -1) / 100;
     final["Optimality gap (%)"] = (double)temp.value("OptimalityGap (x100)", -1) / 100;
     final["Number of nodes"] = temp.value("nNodes", -1);
@@ -61,7 +62,8 @@ json ConvertMap(map<string, int> stats) {
     final["Average lazy cut time (sec)"] = (double)temp.value("LazyCutTime (x1000)", -1) / 1000;
     final["Number of user cuts"] = temp.value("nUserCuts", -1);
     final["Average user cut time (sec)"] = (double)temp.value("UserCutTime (x1000)", -1) / 1000;
-
+    final["Number of restricted subproblems"] = (int)temp.value("nRestricted", -1);
+    final["Number of diversified subproblems"] = (int)temp.value("nDiversified", -1);
     return final;
 }
 
@@ -98,8 +100,8 @@ int main(int argc, char** argv) {
     //map <string, map<string, vector<int>>> stats = Stats;
 
     json temp;
-    vector<string> doubles = { "Solve time (sec)" , "Objective value" , "Optimality gap (%)" , "Average lazy cut time (sec)" , "Average user cut time (sec)" };
-    vector<string> ints = { "Number of nodes" , "Number of lazy cuts" , "Number of user cuts" };
+    vector<string> doubles = { "Solve time, LP (sec)" , "Solve time, MIP (sec)", "Objective value" , "Optimality gap (%)" , "Average lazy cut time (sec)" , "Average user cut time (sec)" };
+    vector<string> ints = { "Number of nodes" , "Number of lazy cuts" , "Number of user cuts", "Number of restricted subproblems", "Number of diversified subproblems" };
     vector<string> strings = { "Cplex status" };
 
     for (string key : doubles) { temp[key] = vector<double>(); }
@@ -282,9 +284,11 @@ int main(int argc, char** argv) {
         //    Results_stats = Results;
         //}
 
-        vector<string> doubles = { "Solve time (sec)" , "Objective value" , "Optimality gap (%)" , "Average lazy cut time (sec)" , "Average user cut time (sec)" };
-        vector<string> ints = { "Number of nodes" , "Number of lazy cuts" , "Number of user cuts" };
+        vector<string> doubles = { "Solve time, LP (sec)" , "Solve time, MIP (sec)", "Objective value" , "Optimality gap (%)" , "Average lazy cut time (sec)" , "Average user cut time (sec)" };
+        vector<string> ints = { "Number of nodes" , "Number of lazy cuts" , "Number of user cuts", "Number of restricted subproblems", "Number of diversified subproblems" };
         vector<string> strings = { "Cplex status" };
+
+
         vector<string> labels = { "LocalBranching" };
 
 

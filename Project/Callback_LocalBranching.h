@@ -38,36 +38,30 @@ private:
 
 	//Data members
 	Data_Improved data;
+	IloModel MasterModel;
 	BoolVar2D x;
 	IloNumVarArray theta;
 	IloNumVar theta_obj;
 	BoolVar2D trust;
+
+
 	int trustCount = -1;
-	//IloModel BaseModel;
-	IloModel MasterModel;
-	//Core point calculation
+
+	
+
 	ArrayXXd core_point;
 	vector<VectorXd> core_coverage;
-	bool UpdatedSolution = false;
-	//Looping detection
-	double incumbent = 0.0;
-	double obj_val = -1.0;
-	int obj_counter = 0;
 	
-	bool SkipFractional = false;
 
 	//Solution objects
 	ArrayXXd BestSolution;
 	double LowerBound = 0.0;
-	double UpperBound = 1e+20;
-	double thresholdObjective = 0.0;
-	int DisplayCounter = 0;
+	bool UpdatedSolution = false;
 
 	void UpdateSolution(const ArrayXXd& x_tilde, double obj)
 	{
 		BestSolution = x_tilde;
 		LowerBound = obj;
-		thresholdObjective = obj + 1e-4 * (obj + 1e-10);
 		UpdatedSolution = true;
 		cout << "Found solution of value: " << obj << endl;
 	}
@@ -79,23 +73,20 @@ private:
 	int& T = data.T;
 	int& M_bar = data.M_bar;
 	vector<int>& P = data.P;
-	int M = data.params["M"];
-	vector<int> Mj;
+
 
 
 	//Functions for adding cuts
 	void IntegerCutCallback(const IloCplex::Callback::Context& context, ArrayXXd& x_tilde, double obj_tilde = -1, bool diversify = true);
-	//void FractionalCutCallback(const IloCplex::Callback::Context& context, ArrayXXd& x_tilde);
+
 
 	void AddBendersCuts(const IloCplex::Callback::Context& context, const ArrayXXd& x_tilde);
 	void AddTrustCutsInner(IloEnv& env, IloModel& model, const ArrayXXd& x_tilde, double distance);
-	//void AddTrustCutsOuter(IloEnv& env, IloModel& model, const ArrayXXd& x_tilde, double distance);
 	void AddTrustCutsMaster(IloEnv& env, const IloCplex::Callback::Context& context, const ArrayXXd& x_tilde, double distance);
 	void AddTabooCut(IloEnv& env, IloModel& model, const ArrayXXd& x_tilde);
 	void AddTabooCutMaster(IloEnv& env, const IloCplex::Callback::Context& context, const ArrayXXd& x_tilde);
 
-	//double CalculateDistance(const ArrayXXd& x1, const ArrayXXd& x2);
-	//double CalculateDistanceFast(const ArrayXXd& x_upper, const ArrayXXd& x);
+
 	bool WithinRestrictedDistance(const ArrayXXd& x1, const ArrayXXd& x2);
 	bool WithinRestrictedDistanceFast(const ArrayXXd& x_upper, const ArrayXXd& x);
 
@@ -118,22 +109,19 @@ public:
 			VectorXd cover = VectorXd::Constant(P[t], 0.0);
 			core_coverage.push_back(cover);
 		}
-		for (int val : data.params["Mj"]) { Mj.push_back(val); }
-
 	};
 
 	virtual void invoke(const IloCplex::Callback::Context& context);
 
-	map<string, int> stats = {};
+	map<string, int> stats = { {"nRestricted",0}, {"nDiversified",0} };
 	CallbackStatus status = CallbackStatus::Unknown;
 
 
 	ArrayXXd GetSolution() { return BestSolution; }
 	void SetSolution(ArrayXXd Solution) { BestSolution = Solution; }
 	double GetSolutionObjective() { return LowerBound; }
-	double GetOptimalityGap() { return (UpperBound - LowerBound) / LowerBound; }
-	
 
+	
 	vector<double> LazyCutTimes;
 	vector<double> UserCutTimes;
 };

@@ -1,40 +1,18 @@
 #include "Callback_LocalBranching.h"
 
 
-
+//When it's a candidate solution: Run the local branching method
+//When it's a fractional solution: Check if there's an integer solution within distance 2 and,
+//if so, run the local branching method on it
 void Callback_LocalBranching::invoke(const IloCplex::Callback::Context& context)
 {
-	//double BestBound = context.getDoubleInfo(IloCplex::Callback::Context::Info::BestBound);
-	//if (BestBound < UpperBound) {
-	//	UpperBound = BestBound;
-	//	if (context.getIntInfo(IloCplex::Callback::Context::Info::NodeCount) - DisplayCounter >= 1000) {
-	//		cout << "Best bound: " << UpperBound;
-	//		cout << "   Best integer: " << LowerBound;
-	//		cout << "   Optimality gap: " << 100* (UpperBound - LowerBound) / LowerBound << endl;
-	//		DisplayCounter = context.getIntInfo(IloCplex::Callback::Context::Info::NodeCount);
-	//	}
-	//	if (UpperBound < thresholdObjective) {
-	//		//cout << "Optimality condition reached." << endl;
-	//		status = CallbackStatus::Optimal;
-	//		context.abort();
-	//	}
-	//}
-	
 	try {
-
 		chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
 
 		switch (context.getId()) {
 		////////////////////////////////
 		case (IloCplex::Callback::Context::Id::Candidate):
 		{
-			//double obj_new = context.getCandidateObjective();
-			//if (obj_new < LowerBound) { 
-			//	//cout << "Integer solution rejected. " << endl;  
-			//	context.rejectCandidate(); 
-			//	return; 
-			//}
-
 			ArrayXXd x_tilde = ArrayXXd::Constant(T, M_bar, 0.0);
 			//Get current solution value, x_tilde
 			for (int t = 0; t < T; t++) {
@@ -46,26 +24,17 @@ void Callback_LocalBranching::invoke(const IloCplex::Callback::Context& context)
 			stats["nLazyCuts"] += 1;
 			double time = chrono::duration_cast<chrono::duration<double>>(chrono::steady_clock::now() - t1).count();
 			if (LazyCutTimes.size() < 512) { LazyCutTimes.push_back(time); }
-			////cout << "Lazy cut time: " << time << endl;;
+
 			break;
 		}
 		////////////////////////////////
 		case (IloCplex::Callback::Context::Id::Relaxation):
 		{
-			////cout << "Relxation node ID:" << context.getIntInfo(IloCplex::Callback::Context::Info::Infos::NodeUID) << endl;
-			double obj_new = context.getRelaxationObjective();
-			//if (obj_new < LowerBound) {  
-			//	context.pruneCurrentNode();
-			//	cout << "Fractional solution pruned." << endl;
-			//	return; 
-			//}
-
 			ArrayXXd x_tilde = ArrayXXd::Constant(T, M_bar, 0.0);
 			//Get current solution value, x_tilde
 			for (int t = 0; t < T; t++) {
 				for (int j_bar = 0; j_bar < M_bar; j_bar++) { x_tilde(t,j_bar) = context.getRelaxationPoint(x[t][j_bar]); }
 			}
-
 
 			if (WithinRestrictedDistanceFast(x_tilde, x_tilde.floor())) {
 				ArrayXXd x_floor = x_tilde.floor();
@@ -78,22 +47,10 @@ void Callback_LocalBranching::invoke(const IloCplex::Callback::Context& context)
 				stats["nUserCuts"] += 1;
 			}
 
-			
 			double time = chrono::duration_cast<chrono::duration<double>>(chrono::steady_clock::now() - t1).count();
 			if (UserCutTimes.size() < 512) { UserCutTimes.push_back(time); }
 
 			break;
-		}
-		////////////////////////////////
-		case (IloCplex::Callback::Context::Id::Branching): 
-		{
-			//cout << "Branching node ID:" << context.getIntInfo(IloCplex::Callback::Context::Info::Infos::NodeUID) << endl;
-			double obj_new = context.getRelaxationObjective();
-			if (obj_new < LowerBound) {  
-				context.pruneCurrentNode(); 
-				//cout << "Branch pruned." << endl;
-				return;
-			}
 		}
 		////////////////////////////////
 		default:
@@ -101,12 +58,14 @@ void Callback_LocalBranching::invoke(const IloCplex::Callback::Context& context)
 		}
 	}
 	catch (IloException & e) {
-		//cout << "Exception during callback: " << e << endl;
+		cout << "Exception during callback: " << e << endl;
 		throw e;
 	}
 
+	////Add post-heuristic for best solution found
+	////Most values are not correct, but (importantly) the objective is
+	////This should allow CPLEX to perform bounds checking
 	if (UpdatedSolution) {
-		//cout << "Adding post heuristic solution." << endl;
 		IloEnv env = context.getEnv();
 
 		IloNumVarArray vars(env);
@@ -116,6 +75,8 @@ void Callback_LocalBranching::invoke(const IloCplex::Callback::Context& context)
 				vars.add(x[t][j_bar]);
 				vals.add(BestSolution(t, j_bar));
 			}
+			////CPLEX requires all variables to be included to use the NoCheck option (required to get around trust cuts)
+			////So we just set everything to 0
 			vars.add(theta[t]);
 			vals.add(0);
 			for (auto i = 0; i < trust.getSize(); i++) {
@@ -128,10 +89,7 @@ void Callback_LocalBranching::invoke(const IloCplex::Callback::Context& context)
 
 		context.postHeuristicSolution(vars, vals, LowerBound, IloCplex::Callback::Context::SolutionStrategy::NoCheck);
 		UpdatedSolution = false;
-		//cout << "Added post heuristic solution." << endl;
 	}
-	
-	//cout << "Returning to master problem." << endl;
 }
 
 
@@ -139,10 +97,9 @@ void Callback_LocalBranching::invoke(const IloCplex::Callback::Context& context)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-
+//Update the core point and the coverage of the core point
 void Callback_LocalBranching::UpdateCorePoint(ArrayXXd x_new)
 {
-	//cout << "Updating core point" << endl;
 	core_point = (core_point + x_new) / 2;
 	for (int t = 0; t < T; t++) {
 		VectorXd cover = VectorXd::Constant(P[t], 0.0);
@@ -153,20 +110,20 @@ void Callback_LocalBranching::UpdateCorePoint(ArrayXXd x_new)
 		}
 		core_coverage[t] = cover;
 	}
-	//cout << "Updated core point." << endl;
 }
 
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-
+/*
+We first try and find the best solution within distance 2 of a candidate solution x_tilde using a specialised method. Depending on optimality, we cut the solutions 
+around x_tilde. If we can't improve x_tilde, we find a good quality solution near-ish x_tilde to add more diverse Bender's optimality cuts.
+*/
 void Callback_LocalBranching::IntegerCutCallback(const IloCplex::Callback::Context& context, ArrayXXd& x_tilde, double obj_tilde, bool diversify)
 {
-	//cout << "Begining Integer callback." << endl;
 	IloEnv env = context.getEnv();
-	
+
 	//Initially, CPLEX does not have the correct objective for solutions (as the associated Bender's cut is missing). 
 	//So, if we receive the solution directly from CPLEX, we calculate the correct objective.
 	if (obj_tilde == -1) { obj_tilde = CalculateObjective(x_tilde); } 
@@ -178,10 +135,7 @@ void Callback_LocalBranching::IntegerCutCallback(const IloCplex::Callback::Conte
 	do
 	{
 		foundImprovement = false;
-
-		//chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
 		IloAlgorithm::Status status = SubproblemRestricted(env, x_tilde, x_hat, obj_hat);
-
 		switch (status)
 		{
 		////////////////////////////////
@@ -236,7 +190,6 @@ void Callback_LocalBranching::IntegerCutCallback(const IloCplex::Callback::Conte
 
 
 	if (diversify) {
-		//chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
 		IloAlgorithm::Status status = SubproblemDiversify(env, x_tilde, x_hat, obj_hat);
 		switch (status)
 		{
@@ -270,27 +223,19 @@ void Callback_LocalBranching::IntegerCutCallback(const IloCplex::Callback::Conte
 		}
 		} //End of switch statement
 	}
-	//cout << "Completed Integer callback." << endl;
 }
 
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-//void Callback_LocalBranching::FractionalCutCallback(const IloCplex::Callback::Context& context, ArrayXXd& x_tilde)
-//{
-//
-//
-//
-//}
-
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
+/*
+Add either Multi1B1 or Multi1 Pareto-optimal B1 cuts to the model. Since these are added via rejectCandidate (like the trust cuts), it is not
+clear how these are handled by CPLEX. Documentation suggest they are all added as lazy cut constraints, but which ones get added to the model
+is unclear.
+*/
 void Callback_LocalBranching::AddBendersCuts(const IloCplex::Callback::Context& context, const ArrayXXd& x_tilde)
 {
-	//cout << "Begining Benders cuts." << endl;
 	IloEnv env = context.getEnv();
 	vector<VectorXd> I_tilde = CalculateItilde(x_tilde);
 
@@ -307,7 +252,6 @@ void Callback_LocalBranching::AddBendersCuts(const IloCplex::Callback::Context& 
 	//	switch (context.getId()) {
 	//	case (IloCplex::Callback::Context::Id::Candidate):
 	//		if (context.getCandidateValue(lhs) < -covered -EPS) {
-	//			//nCutsAdded += 1;
 	//			context.rejectCandidate(lhs >= -covered);
 	//		}
 	//		lhs.end();
@@ -355,35 +299,20 @@ void Callback_LocalBranching::AddBendersCuts(const IloCplex::Callback::Context& 
 		}
 		}
 	}
-	//cout << "Completed Benders cuts." << endl;
+
 }
 
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-
-//void Callback_LocalBranching::AddTrustCutsOuter(IloEnv& env, IloModel& model, const ArrayXXd& x_tilde, double distance)
-//{
-//
-//	for (int t = 0; t < T; t++) {
-//		IloExpr delta(env);
-//		delta += distance * trust[trustCount][t];
-//		for (int j_bar = 0; j_bar < M_bar; j_bar++) {
-//			if (x_tilde(t, j_bar) > 1 - EPS) { delta += 1 - x[t][j_bar]; }
-//			else { delta += x[t][j_bar]; }
-//		}
-//		model.add(delta >= distance);
-//		delta.end();
-//	}
-//
-//
-//}
-
+/*
+Add the trust cuts of specified distance to the model. Since we are only considered with integer solutions, the distance is typically 1 higher than we prove
+(e.g. if we have solved the subproblem up to distance 2, the constraints will impose a distance of at least 3). Since these constraints require the (fixed size)
+trust variables, we replace the cuts by taboo/no-good cuts if we have run out of variables. 
+*/
 void Callback_LocalBranching::AddTrustCutsMaster(IloEnv& env, const IloCplex::Callback::Context& context, const ArrayXXd& x_tilde, double distance)
 {
-	//cout << "Begining trust cuts for Master Problem." << endl;
 	trustCount += 1; //This should be locked to prevent accidental overwriting, but in single-threaded this is fine
 
 	//We can't change the size of variables midway through solving, and so we must resort to a backup method if we fill up the trust count
@@ -403,8 +332,6 @@ void Callback_LocalBranching::AddTrustCutsMaster(IloEnv& env, const IloCplex::Ca
 			else { delta += x[t][j_bar]; }
 		}
 		cuts.add(delta >= distance);
-		////cout << cuts[t+1] << endl;
-		//delta.end();
 	}
 	
 	
@@ -422,20 +349,8 @@ void Callback_LocalBranching::AddTrustCutsMaster(IloEnv& env, const IloCplex::Ca
 		break;
 	}
 	}
-	//context.rejectCandidate(IloSum(trust[trustCount]) <= T - 1);
-	//for (int t = 0; t < T; t++) {
-	//	IloExpr delta(env);
-	//	delta += distance * trust[trustCount][t];
-	//	for (int j_bar = 0; j_bar < M_bar; j_bar++) {
-	//		if (x_tilde(t, j_bar) > 1 - EPS) { delta += 1 - x[t][j_bar]; }
-	//		else { delta += x[t][j_bar]; }
-	//	}
-	//	context.rejectCandidate(delta >= distance);
-	//	delta.end();
-	//}
 
-	//cuts.end();
-	//cout << "Completed trust cuts for Master Problem." << endl;
+	cuts.end();
 }
 
 
@@ -443,7 +358,10 @@ void Callback_LocalBranching::AddTrustCutsMaster(IloEnv& env, const IloCplex::Ca
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-
+/*
+Ensures that the model is solving within the restricted distance. Since this is used for both the restricted and diversified subproblems, this is designed to be added to
+any model and with any distance.
+*/
 void Callback_LocalBranching::AddTrustCutsInner(IloEnv& env, IloModel& model, const ArrayXXd& x_tilde, double distance)
 {
 	for (int t = 0; t < T; t++) {
@@ -459,11 +377,15 @@ void Callback_LocalBranching::AddTrustCutsInner(IloEnv& env, IloModel& model, co
 
 
 
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 
-
+/*
+Adds a simple taboo/no-good cut to the model, forcing the solution to have at least one binary variable in x be different than x_tilde.
+This version is principally designed for the diversified subproblem, to ensure we end up with a different solution.
+*/
 void Callback_LocalBranching::AddTabooCut(IloEnv& env, IloModel& model, const ArrayXXd& x_tilde)
 {
 	IloExpr taboo(env);
@@ -476,9 +398,18 @@ void Callback_LocalBranching::AddTabooCut(IloEnv& env, IloModel& model, const Ar
 	model.add(taboo >= 1);
 }
 
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+/*
+Adds a simple taboo/no-good cut to the model, forcing the solution to have at least one binary variable in x be different than x_tilde.
+This is weaker than the trust counts, but is sometimes the best we can do. Additionally, it does not rely on the trust variables, and so
+works as a backup should we run out of those
+*/
 void Callback_LocalBranching::AddTabooCutMaster(IloEnv& env, const IloCplex::Callback::Context& context, const ArrayXXd& x_tilde)
 {
-	//cout << "Begining taboo cuts for Master Problem." << endl;
 	IloExpr taboo(env);
 	for (int t = 0; t < T; t++) {
 		for (int j_bar = 0; j_bar < M_bar; j_bar++) {
@@ -486,7 +417,6 @@ void Callback_LocalBranching::AddTabooCutMaster(IloEnv& env, const IloCplex::Cal
 			else { taboo += x[t][j_bar]; }
 		}
 	}
-	////cout << taboo << endl;
 
 	switch (context.getId()) {
 	case (IloCplex::Callback::Context::Id::Candidate):
@@ -500,16 +430,19 @@ void Callback_LocalBranching::AddTabooCutMaster(IloEnv& env, const IloCplex::Cal
 		break;
 	}
 	}
-	
-	//cout << "Completed cuts for Master Problem." << endl;
+
 }
+
 
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-//Calculate the l-infinity norm across all years for each j_bar, then return the sum 
+
+/*
+Checks if the solutions x1 and x2 are within distance 2, using our distance metric.
+*/
 bool Callback_LocalBranching::WithinRestrictedDistance(const ArrayXXd& x1, const ArrayXXd& x2)
 {
 	for (int t = 0; t < T; t++) {
@@ -524,7 +457,10 @@ bool Callback_LocalBranching::WithinRestrictedDistance(const ArrayXXd& x1, const
 
 
 
-//As the CalculateDistance function, but when we are guaranteed that x_upper >= x 
+/*
+Checks if the solutions x_upper and x are within distance 2, using our distance metric. As the standard WithinRestrictedDistance, but slightly faster
+since we do not need the absolute value. 
+*/
 bool Callback_LocalBranching::WithinRestrictedDistanceFast(const ArrayXXd& x_upper, const ArrayXXd& x)
 {
 	for (int t = 0; t < T; t++) {
@@ -537,10 +473,11 @@ bool Callback_LocalBranching::WithinRestrictedDistanceFast(const ArrayXXd& x_upp
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-
+/*
+Calculates the true objective value for a solution, not relying on the Bender's cuts or CPLEX.
+*/
 double Callback_LocalBranching::CalculateObjective(const ArrayXXd& x_tilde)
 {
-	//cout << "Calculating objective." << endl;
 	double covered = 0.0;
 	for (int t = 0; t < T; t++) {
 		covered += data.Precovered[t];
@@ -553,7 +490,7 @@ double Callback_LocalBranching::CalculateObjective(const ArrayXXd& x_tilde)
 		}
 		covered += (I_tilde.array() >= 1).matrix().cast<double>().dot(data.weights[t]);
 	}
-	//cout << "Calculated objective." << endl;
+
 	return covered;
 }
 
@@ -561,10 +498,12 @@ double Callback_LocalBranching::CalculateObjective(const ArrayXXd& x_tilde)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
+/*
+Returns the appropriate I_tilde for a given x_tilde. Slightly optimised for integer solutions, since that should be the only
+ones which we calculate.
+*/
 vector<VectorXd> Callback_LocalBranching::CalculateItilde(const ArrayXXd& x_tilde)
 {
-	//cout << "Calculating I tilde." << endl;
 	vector<VectorXd> I_tilde;
 	for (int t = 0; t < T; t++) {
 		I_tilde.push_back(VectorXd::Constant(P[t], 0.0));
@@ -574,9 +513,7 @@ vector<VectorXd> Callback_LocalBranching::CalculateItilde(const ArrayXXd& x_tild
 		}
 
 	}
-	//cout << "Calculated I tilde." << endl;
 	return I_tilde;
-	
 }
 
 
@@ -584,10 +521,15 @@ vector<VectorXd> Callback_LocalBranching::CalculateItilde(const ArrayXXd& x_tild
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-
+/*
+Finds the best solution withn distance 2 using a specialised method. More specifically, we generate just enough Bender's optimality cuts
+to get the true value of all solutions within distance 2, then run CPLEX (without the callback and with all preprocessing power)
+to solve the model directly. In principle, it may be possible to have a slightly faster method using explicit enumeration, however 
+this ensures that the managerial constraints (precedence and budget) are satisfied, as well as all of our trust cuts.
+In general, this manages to solve the subproblem to optimality.
+*/
 IloAlgorithm::Status Callback_LocalBranching::SubproblemRestricted(IloEnv& env, const ArrayXXd& x_tilde, ArrayXXd& sol, double& obj)
 {
-	//cout << "Beginning restricted problem." << endl;
 	IloModel submodel(env);
 	submodel.add(MasterModel);
 
@@ -692,7 +634,8 @@ IloAlgorithm::Status Callback_LocalBranching::SubproblemRestricted(IloEnv& env, 
 	IloAlgorithm::Status status = subcplex.getStatus();
 	subcplex.end();
 	submodel.end();
-	////cout << "Completed restricted problem." << endl;
+	stats["nRestricted"] += 1;
+
 	return status;
 }
 
@@ -701,10 +644,12 @@ IloAlgorithm::Status Callback_LocalBranching::SubproblemRestricted(IloEnv& env, 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-
+/*
+Tries to find the best solution within distance 4 (but excluding x_tilde) using branch-and-Bender's cuts. In general, we are not able to solve this and just return 
+a heuristic solution different than x_tilde.
+*/
 IloAlgorithm::Status Callback_LocalBranching::SubproblemDiversify(IloEnv& env, const ArrayXXd& x_tilde, ArrayXXd& sol, double& obj)
 {
-	//cout << "Begining diversifed problem." << endl;
 	IloModel submodel(env);
 	submodel.add(MasterModel);
 
@@ -745,6 +690,7 @@ IloAlgorithm::Status Callback_LocalBranching::SubproblemDiversify(IloEnv& env, c
 	IloAlgorithm::Status status = subcplex.getStatus();
 	subcplex.end();
 	submodel.end();
-	//cout << "Completed diversifed problem." << endl;
+	stats["nDiversified"] += 1;
+
 	return status;
 }
