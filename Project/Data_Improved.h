@@ -49,7 +49,9 @@ public:
 	vector<Eigen::VectorXd> weights;
 
 	void load(string set, string file, bool verbose);
-	double SolutionQuality(vector<vector<int>> Sol);
+	double SolutionQuality(const vector<vector<int>>& Sol);
+	double SolutionQuality(const ArrayXXd& Sol);
+	double SolutionQualityContinuous(const ArrayXXd& Sol);
 
 	template <class Temp>
 	vector<double> RemainingBudget(const vector<Temp>& Sol) {

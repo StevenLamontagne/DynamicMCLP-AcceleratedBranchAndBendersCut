@@ -12,7 +12,7 @@ void Greedy_Improved::Solve(bool _verbose)
 	int M = data.params["M"];
 	vector<int> Mj = data.params["Mj"];
 
-	map<pair<int,int>, int> coordConverter;
+	map<pair<int, int>, int> coordConverter;
 	for (int j_bar = 0; j_bar < M_bar; j_bar++) { coordConverter[make_pair(data.params["station_coord"][j_bar][0], data.params["station_coord"][j_bar][1])] = j_bar; }
 
 	vector<VectorXd> cover;
@@ -36,7 +36,7 @@ void Greedy_Improved::Solve(bool _verbose)
 		//Initialise coverage of triplets and solution quality
 		cover.push_back(VectorXd::Constant(P[t], 0.0)); //By construction, all of the precovered triplets have been removed
 		//SolutionQuality += data.Precovered[t];
-		
+
 	}
 	if (verbose) {
 		cout << "Initial coverage: " << SolutionQuality << endl << "\n" << endl;
@@ -52,7 +52,7 @@ void Greedy_Improved::Solve(bool _verbose)
 		if (verbose) { cout << "Starting year " << t << endl; }
 
 		bool foundImprovement = 0;
-		
+
 		//Start adding outlets
 		do
 		{
@@ -62,7 +62,7 @@ void Greedy_Improved::Solve(bool _verbose)
 			Costs.setConstant(0.0);
 			VectorXd uncovered = (cover[t].array() < 1).matrix().cast<double>();
 			//cout << uncovered.sum() << endl;;
-			
+
 			//Iterate over stations
 			for (int j = 0; j < M; j++) {
 				int updated = Solution[t][j] + 1;

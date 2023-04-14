@@ -30,12 +30,20 @@ private:
 	Data_Improved data;
 	BoolVar2D x;
 	IloNumVarArray theta;
-	double incumbent = 0.0;
+	
 	ArrayXXd core_point;
 	vector<VectorXd> core_coverage;
-	double obj_val = -1.0;
+
 	short int duplicate_counter = 0;
 	double dual_val = 1.7e307;
+	bool SkipFractional = false;
+
+	double BestObjective = 0.0;
+	ArrayXXd BestSolution;
+
+	ArrayXXd IncumbentSolution;
+	ArrayXd IncumbentTheta;
+	double IncumbentObjective = 0.0;
 
 	//Define constants for easier reading and writing
 	int& T = data.T;

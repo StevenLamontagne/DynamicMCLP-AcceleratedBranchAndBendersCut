@@ -28,8 +28,8 @@ using json = nlohmann::json;
 //
 #include "Data_Improved.h"
 #include "Greedy_Improved.h"
-#include "Model_Improved.h"
-//#include "Model_LocalBranching.h"
+//#include "Model_Improved.h"
+#include "Model_LocalBranching.h"
 
 template<typename ... Args>
 std::string string_format(const std::string& format, Args ... args)
@@ -53,15 +53,17 @@ json ConvertMap(map<string, int> stats) {
 
     vector<string> StatusConversion = { "Unknown", "Feasible", "Optimal", "Infeasible", "Unbounded", "InfeasibleOrUnbounded", "Error", "Bounded"};
     final["Cplex status"] = StatusConversion[temp.value("CplexStatus", 0)];
-    final["Solve time (sec)"] = (double)temp.value("SolveTime (x100)", -1) / 100;
+    final["Solve time, LP (sec)"] = (double)temp.value("Solve time, LP (x100)", -1) / 100;
+    final["Solve time, MIP (sec)"] = (double)temp.value("Solve time, MIP (x100)", -1) / 100;
     final["Objective value"] = (double)temp.value("ObjectiveValue (x100)", -1) / 100;
-    final["Optimality gap"] = (double)temp.value("OptimalityGap (x100)", -1) / 100;
+    final["Optimality gap (%)"] = (double)temp.value("OptimalityGap (x100)", -1) / 100;
     final["Number of nodes"] = temp.value("nNodes", -1);
     final["Number of lazy cuts"] = temp.value("nLazyCuts", -1);
     final["Average lazy cut time (sec)"] = (double)temp.value("LazyCutTime (x1000)", -1) / 1000;
     final["Number of user cuts"] = temp.value("nUserCuts", -1);
     final["Average user cut time (sec)"] = (double)temp.value("UserCutTime (x1000)", -1) / 1000;
-
+    final["Number of restricted subproblems"] = (int)temp.value("nRestricted", -1);
+    final["Number of diversified subproblems"] = (int)temp.value("nDiversified", -1);
     return final;
 }
 
@@ -98,8 +100,8 @@ int main(int argc, char** argv) {
     //map <string, map<string, vector<int>>> stats = Stats;
 
     json temp;
-    vector<string> doubles = { "Solve time (sec)" , "Objective value" , "Optimality gap" , "Average lazy cut time (sec)" , "Average user cut time (sec)" };
-    vector<string> ints = { "Number of nodes" , "Number of lazy cuts" , "Number of user cuts" };
+    vector<string> doubles = { "Solve time, LP (sec)" , "Solve time, MIP (sec)", "Objective value" , "Optimality gap (%)" , "Average lazy cut time (sec)" , "Average user cut time (sec)" };
+    vector<string> ints = { "Number of nodes" , "Number of lazy cuts" , "Number of user cuts", "Number of restricted subproblems", "Number of diversified subproblems" };
     vector<string> strings = { "Cplex status" };
 
     for (string key : doubles) { temp[key] = vector<double>(); }
@@ -107,173 +109,43 @@ int main(int argc, char** argv) {
     for (string key : strings) { temp[key] = vector<string>(); }
 
 
+    time_t start;
+    time(&start);
+    string file = "MC0_Home.json";
+    Data_Improved data;
+    data.load(basefile, file, true);
+    std::cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
+    //std::cout << "Precovered: " << data.Precovered[0] + data.Precovered[1] + data.Precovered[2] + data.Precovered[3] << endl;
 
-    for (int test = 0; test < 1; test++) {
-        time_t start;
-        time(&start);
+    //Greedy_Improved G;
+    //G.SetData(data);
+    //G.Solve(false);
 
-        Data_Improved data;
-        data.load(basefile, string_format("MC%d_Simple.json", test), true);
-        std::cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
-
-        //Greedy_Improved G;
-        //G.SetData(data);
-        //G.Solve(false);
-
-        //std::cout << "Greedy solving time: " << G.SolveTime << " seconds" << endl;
-        //std::cout << "Greedy solution quality: " << G.SolutionQuality << endl;
-
-
-        {
-        string label = "Multi1B1_RootFractionalCallback";
-        json params = {{ "verbose", true } };
-        Model_Improved mdl;
-        mdl.SetData(data);
-        cout << "Method: " << label << endl;
-        mdl.Solve(params);
-        cout << "Solution quality (model): " << mdl.ObjectiveValue << endl;
-        //for (pair<string, int> res : mdl.stats) {
-        //    string category = res.first;
-        //    int value = res.second;
-        //    cout << category + ": " << value << endl;
-        //}
-        json final = ConvertMap(mdl.stats);
-        for (auto& el : final.items())
-        {
-            temp[el.key()].push_back(el.value());
-            std::cout << el.key() << ": " << el.value() << '\n';
-        }
-        std::ofstream f1("Test.json");
-        f1 << std::setw(3) << temp << std::endl;
-        f1.close();
+    //std::cout << "Greedy solving time: " << G.SolveTime << " seconds" << endl;
+    //std::cout << "Greedy solution quality: " << G.SolutionQuality << endl;
 
 
-        //cout << "Solution quality (data): " << data.SolutionQuality(mdl.Solution) << endl;
-        //std::ofstream f1("Solution.json");
-        //json sol = { {"Exact", mdl.Solution}};
-        //f1 << std::setw(3) << sol << std::endl;
-        //f1.close();
-
-
-        }
-
-
-
-
-
-        //Data data;
-        //data.load_compressed(basefile, string_format("MC%d_compressed.json", test), true);
-        //std::cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
-
-        //{
-        //    string label = "Multi1B1_ImprovedTrust2";
-        //    json params = { {"multicut", multicuts::Multi1B1}, {"heuristic", useHeuristic::Warmstart}, {"use_trust", true},  {"trust_threshold", 2}, { "verbose", true } };
-        //    Model_Multicut mdl;
-        //    mdl.SetData(data);
-        //    cout << "Method: " << label << endl;
-        //    mdl.Solve(params);
-
-        //}
-
-        //Model_BB mdl;
-        //mdl.SetData(data);
-        //mdl.Solve();
-        //cout << "Objective value: " << mdl.ObjectiveValue << endl;
-        //{
-        //    json params = { {"multicut", multicuts::Multi1B1},{ "verbose", true } };
-        //    Model_Multicut mdl;
-        //    mdl.SetData(data);
-        //    mdl.Solve(params);
-        //    cout << "\n \n" << endl;
-        //}
-
-        //{
-        //    json params = { {"multicut", multicuts::Multi3PO1}, {"heuristic", useHeuristic::Warmstart}, { "verbose", true } };
-        //    Model_Multicut mdl;
-        //    mdl.SetData(data);
-        //    mdl.Solve(params);
-        //    for (pair<string, int> res : mdl.stats) {
-        //        string category = res.first;
-        //        int value = res.second;
-        //        cout << category + ": " << value << endl;
-        //    }
-        //    
-        //}
-        //{
-        //    json params = { {"multicut", multicuts::Multi1B1}, {"heuristic", useHeuristic::Warmstart}, { "verbose", true } };
-        //    Model_Multicut mdl;
-        //    mdl.SetData(data);
-        //    mdl.Solve(params);
-        //    for (pair<string, int> res : mdl.stats) {
-        //        string category = res.first;
-        //        int value = res.second;
-        //        cout << category + ": " << value << endl;
-        //    }
-
-        //}
-        //{
-        //    json params = { {"multicut", multicuts::SinglePO1}, {"heuristic", useHeuristic::Warmstart}, { "verbose", true } };
-        //    Model_Multicut mdl;
-        //    mdl.SetData(data);
-        //    mdl.Solve(params);
-        //    for (pair<string, int> res : mdl.stats) {
-        //        string category = res.first;
-        //        int value = res.second;
-        //        cout << category + ": " << value << endl;
-        //    }
-
-        //}
-
-        //{
-        //    json params = { {"multicut", multicuts::Multi1PO1}, {"heuristic", useHeuristic::Warmstart}, { "verbose", true } };
-        //    Model_Multicut mdl;
-        //    mdl.SetData(data);
-        //    mdl.Solve(params);
-        //    for (pair<string, int> res : mdl.stats) {
-        //        string category = res.first;
-        //        int value = res.second;
-        //        cout << category + ": " << value << endl;
-        //    }
-
-        //}
-        //{
-        //    json params = { {"multicut", multicuts::Multi1B1}, {"use_trust", true}, {"trust_threshold", 5.0 }, { "verbose", true } };
-        //    Model_Multicut mdl;
-        //    mdl.SetData(data);
-        //    mdl.Solve(params);
-        //    cout << "\n \n" << endl;
-        //}
-
-        //{
-        //    json params = { {"multicut", multicuts::Multi1B1}, {"use_trust", true}, {"trust_threshold", 7.5 }, { "verbose", true } };
-        //    Model_Multicut mdl;
-        //    mdl.SetData(data);
-        //    mdl.Solve(params);
-        //    cout << "\n \n" << endl;
-        //    cout << "Objective value: " << mdl.ObjectiveValue << endl;
-        //    cout << "\n \n" << endl;
-        //}
-
-        //{
-        //    json params = { {"multicut", multicuts::Multi1B1}, {"use_trust", true}, {"trust_threshold", 10.0 }, { "verbose", true } };
-        //    Model_Multicut mdl;
-        //    mdl.SetData(data);
-        //    mdl.Solve(params);
-        //    cout << "\n \n" << endl;
-        //}
-        //{
-        //    Model_Multicut mdl;
-        //    mdl.SetData(data);
-        //    mdl.Solve("", multicuts::Multi3B2, useHeuristic::Warmstart, 0, true);
-        //    //cout << "Single B1" << endl;
-        //    //cout << "Solution quality (data, optimal: 17989):" << data.SolutionQuality(mdl.Solution) << endl;
-        //    //cout << "Total time: " << mdl.TotalTime << endl;
-        //    cout << "\n \n" << endl;
-        //}
-
-
-
+    {
+    string label = "Multi1B1_RootFractionalCallback";
+    json params = {{ "verbose", true } };
+    Model_LocalBranching mdl;
+    mdl.SetData(data);
+    cout << "Method: " << label << endl;
+    mdl.Solve(params);
+    //for (pair<string, int> res : mdl.stats) {
+    //    string category = res.first;
+    //    int value = res.second;
+    //    cout << category + ": " << value << endl;
+    //}
+    json final = ConvertMap(mdl.stats);
+    for (auto& el : final.items())
+    {
+        temp[el.key()].push_back(el.value());
+        std::cout << el.key() << ": " << el.value() << '\n';
     }
+    }
+
+  
 
 
 
@@ -356,10 +228,10 @@ int main(int argc, char** argv) {
     {
         cout << "Dataset: " << dataset << endl;
         std::string resultspath = "/local_1/outer/lamste/Results/TroisRivieres/C++/" + dataset + "/";
-        string prefix = "Eigen";
-        std::string fp_times = resultspath + prefix + "_SolveTimes.json";
-        std::string fp_gaps = resultspath + prefix + "_OptimalityGaps.json";
-        std::string fp_objs = resultspath + prefix + "_ObjectiveValues.json";
+        string prefix = "LocalBranching";
+        //std::string fp_times = resultspath + prefix + "_SolveTimes.json";
+        //std::string fp_gaps = resultspath + prefix + "_OptimalityGaps.json";
+        //std::string fp_objs = resultspath + prefix + "_ObjectiveValues.json";
         std::string fp_stats = resultspath + prefix + "_Statistics.json";
 
         
@@ -412,14 +284,21 @@ int main(int argc, char** argv) {
         //    Results_stats = Results;
         //}
 
-        vector<string> doubles = { "Solve time (sec)" , "Objective value" , "Optimality gap" , "Average lazy cut time (sec)" , "Average user cut time (sec)" };
-        vector<string> ints = { "Number of nodes" , "Number of lazy cuts" , "Number of user cuts" };
+        vector<string> doubles = { "Solve time, LP (sec)" , "Solve time, MIP (sec)", "Objective value" , "Optimality gap (%)" , "Average lazy cut time (sec)" , "Average user cut time (sec)" };
+        vector<string> ints = { "Number of nodes" , "Number of lazy cuts" , "Number of user cuts", "Number of restricted subproblems", "Number of diversified subproblems" };
         vector<string> strings = { "Cplex status" };
 
-        for (string key : doubles) { Results_stats[key] = vector<double>(); }
-        for (string key : ints) { Results_stats[key] = vector<int>(); }
-        for (string key : strings) { Results_stats[key] = vector<string>(); }
 
+        vector<string> labels = { "LocalBranching" };
+
+
+        for (string label : labels) {
+            if (Results_stats.contains(label)){ continue; }
+            Results_stats[label] = {};
+            for (string key : doubles) { Results_stats[label][key] = vector<double>(); }
+            for (string key : ints) { Results_stats[label][key] = vector<int>(); }
+            for (string key : strings) { Results_stats[label][key] = vector<string>(); }
+        }
 
 
         for (int test = 0; test < maxTest; test++) {
@@ -448,21 +327,22 @@ int main(int argc, char** argv) {
             //    Results_stats[label]["nNodes"].push_back(mdl.nNodes);
             //}
             {
-                string label = "Eigen_FractionalRoot";
+                string label = "LocalBranching";
+                if (!(Results_stats.contains(label))) { throw std::runtime_error("Label missing from JSON. Add label to labels vector."); }
+                if (Results_stats[label]["Cplex status"].size() > (long unsigned int) test) { throw std::runtime_error("Results already populated. Check the label is spelled correctly or disable this error."); }
                 json params = { { "verbose", true } };
-                Model_Improved mdl;
+                Model_LocalBranching mdl;
                 mdl.SetData(data);
                 cout << "Method: " << label << endl;
                 mdl.Solve(params);
                 json final = ConvertMap(mdl.stats);
                 for (auto& el : final.items())
                 {
-                    Results_stats[el.key()].push_back(el.value());
+                    Results_stats[label][el.key()].push_back(el.value());
                 }
                 cout << endl;
 
             }
-
 
 
             //{
