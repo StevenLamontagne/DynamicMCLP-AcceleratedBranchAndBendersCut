@@ -294,7 +294,7 @@ void MultiCutBenders_Model::Solve(json params)
 		stats["CplexStatus"] = status;
 		stats["Solve time, MIP (x100)"] = (int) 100* cplex.getTime();
 		stats["ObjectiveValue (x100)"] = (int) 100* cplex.getObjValue();
-		stats["OptimalityGap (x100)"] = (int) 100* cplex.getMIPRelativeGap();
+		stats["OptimalityGap (x100)"] = (int) 10000 * cplex.getMIPRelativeGap();
 		
 		if (cb.LazyCutTimes.size() > 0) {
 			stats["LazyCutTime (x1000)"] = 1000 * Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(cb.LazyCutTimes.data(), cb.LazyCutTimes.size()).mean();

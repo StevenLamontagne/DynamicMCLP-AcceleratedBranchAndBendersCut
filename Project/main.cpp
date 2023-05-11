@@ -29,7 +29,6 @@ using json = nlohmann::json;
 #include "MultiCutBenders_Model.h"
 #include "LocalBranching_Model.h"
 
-
 template<typename ... Args>
 std::string string_format(const std::string& format, Args ... args)
 {
@@ -45,6 +44,8 @@ double dot(_InIt1 const& vec1, _InIt2 const& vec2) {
     if (vec1.size() != vec2.size()) { throw std::runtime_error("Supplied iterators are different sizes."); } 
     return std::inner_product(std::begin(vec1), std::end(vec1), std::begin(vec2), 0.0); 
 }
+
+
 
 json ConvertMap(map<string, int> stats) {
     json temp = stats;
@@ -109,11 +110,9 @@ int main(int argc, char** argv) {
 
 
 
-
 #ifdef _WIN32
     std::string resultspath = "C:\\Users\\dobby\\Desktop\\Git Hub repo\\Charging-Station_Cpp\\Results\\";
     //std::string file = "C:\\Users\\dobby\\Desktop\\Git Hub repo\\Charging-Station_Cpp\\MC0_Home.json";
-    std::string basefile = "C:\\Users\\dobby\\Desktop\\Git Hub repo\\Charging-Station_Cpp\\";
 
     //json Stats;
     //{
@@ -200,19 +199,19 @@ int main(int argc, char** argv) {
     }
 
     {
-    string label = "MultiCutBenders";
-    json params = { { "verbose", true }, {"budgetType", BUDGET_TYPE::Knapsack}};
-    MultiCutBenders_Model mdl;
-    mdl.SetData(data);
-    cout << "Method: " << label << endl;
-    mdl.Solve(params);
-    //for (pair<string, int> res : mdl.stats) {
-    //    string category = res.first;
-    //    int value = res.second;
-    //    cout << category + ": " << value << endl;
-    //}
-    json final = ConvertMap(mdl.stats);
-    for (auto& el : final.items())
+        string label = "MultiCutBenders";
+        json params = { { "verbose", true }, {"budgetType", BUDGET_TYPE::Knapsack} };
+        MultiCutBenders_Model mdl;
+        mdl.SetData(data);
+        cout << "Method: " << label << endl;
+        mdl.Solve(params);
+        //for (pair<string, int> res : mdl.stats) {
+        //    string category = res.first;
+        //    int value = res.second;
+        //    cout << category + ": " << value << endl;
+        //}
+        json final = ConvertMap(mdl.stats);
+        for (auto& el : final.items())
         {
             temp[el.key()].push_back(el.value());
             std::cout << el.key() << ": " << el.value() << '\n';
@@ -251,74 +250,7 @@ int main(int argc, char** argv) {
 #ifdef __linux__
     int maxTest = 20;
     std::string file;
-    //vector<std::string> datasets = {"Price"}; //Start = 16
-    //vector<std::string> datasets = { "Distance" };
-    //vector<std::string> datasets = { "Simple" };
-    //vector<std::string> datasets = {"LongSpan"};
-
-    //for (auto dataset : datasets) {
-    //    cout << "Dataset: " << dataset << endl;
-    //    std::string basefile = "/local_1/outer/lamste/Data/Precomputed/" + dataset + "/MaximumCover/MC%d.json";
-
-    //    long int reduction_total = 0;
-    //    long int max_total = 0;
-    //    long int uncoverable_total = 0;
-    //    long int precovered_total = 0;
-    //    for (int test = 0; test < maxTest; test++) {
-    //        long int reduction_test = 0;
-    //        long int max_test = 0;
-    //        long int uncoverable_test = 0;
-    //        long int precovered_test = 0;
-    //        file = string_format(basefile, test);
-    //        data.load(file, false);
-    //        for (int t = 0; t < data.T; t++) {
-    //            for (int i = 0; i < data.N; i++) {
-    //                for (int r1 = 0; r1 < data.R[i]; r1++) {
-    //                    max_total += 1;
-    //                    max_test += 1;
-    //                    if (data.P[t][i][r1] == triplet::Uncoverable) {
-    //                        uncoverable_test += 1;
-    //                        uncoverable_total += 1;
-    //                        break;
-    //                    }
-    //                    else if (data.P[t][i][r1] == triplet::Precovered) {
-    //                        precovered_test += 1;
-    //                        precovered_total += 1;
-    //                        break;
-    //                    }
-    //                    else {
-    //                        for (int r2 = data.R[i] - 1; r2 > r1; r2--) {
-    //                            bool isMatch = true;
-    //                            for (int j = 0; j < data.M; j++) {
-    //                                for (int k = 0; k < data.Mj[j]; k++) {
-    //                                    if (data.a[t][i][r1][j][k] != data.a[t][i][r2][j][k]) { isMatch = false; break; }
-    //                                }
-    //                                if (!isMatch) { break; }
-    //                            }
-    //                            if (isMatch) {
-    //                                reduction_total += 1;
-    //                                reduction_test += 1;
-    //                                break;
-    //                            }
-    //                        }
-    //                    }
-    //                }
-    //            }
-    //        }
-    //        cout << "Test " << test << ": " << endl;
-    //        cout << "Clustering: " << 100 * (double)reduction_test / (double)max_test << " %" << endl;
-    //        cout << "Uncoverable: " << 100 * (double)uncoverable_test / (double)max_test << " %" << endl;
-    //        cout << "Precovered: " << 100 * (double)precovered_test / (double)max_test << " %" << endl;
-
-    //    }
-    //    cout << "Dataset average: " << endl;
-    //    cout << "Clustering: " << 100 * (double)reduction_total / (double)max_total << " %" << endl;
-    //    cout << "Uncoverable: " << 100 * (double)uncoverable_total / (double)max_total << " %" << endl;
-    //    cout << "Precovered: " << 100 * (double)precovered_total / (double)max_total << " %" << endl;
-    //    cout << "\n" << endl;
-    //}
     string dataset = argv[1];
-    //for (auto dataset : datasets) 
     {
         cout << "Dataset: " << dataset << endl;
         std::string resultspath = "/local_1/outer/lamste/Results/TroisRivieres/C++/" + dataset + "/";
@@ -327,38 +259,8 @@ int main(int argc, char** argv) {
 
         
         std::string basefile = "/local_1/outer/lamste/Data/Precomputed/" + dataset + "/MaximumCover/";
-
-        //map<string, vector<double>> Results_times;
-        //{
-        //    json Results;
-        //    std::ifstream f(fp_times, ifstream::in);
-        //    f >> Results;
-        //    Results_times = Results;
-        //    f.close();
-        //}
-
-
-        //map<string, vector<double>> Results_objs;
-        //{
-        //    json Results;
-        //    std::ifstream f(fp_objs, ifstream::in);
-        //    f >> Results;
-        //    Results_objs = Results;
-        //    f.close();
-        //}
-
-
-        //map<string, vector<double>> Results_gaps;
-        //{
-        //    json Results;
-        //    std::ifstream f(fp_gaps, ifstream::in);
-        //    f >> Results;
-        //    f.close();
-        //    Results_gaps = Results;
-        //}
-
-
-        //map<string, map<string, vector<int>>> Results_stats;     
+        string sharedFile = basefile + "Shared.json";
+        json Results_stats;
         //{
         //    json Results;
         //    std::ifstream f(fp_stats, ifstream::in);
@@ -374,13 +276,8 @@ int main(int argc, char** argv) {
 
         vector<string> labels = {"BranchAndCut", "SingleCutBenders", "MultiCutBenders", "LocalBranching"};
 
-        vector<string> doubles = { "Solve time (sec)" , "Objective value" , "Optimality gap (%)" , "Average lazy cut time (sec)" , "Average user cut time (sec)" };
-        vector<string> ints = { "Number of nodes" , "Number of lazy cuts" , "Number of user cuts" };
-        vector<string> strings = { "Cplex status" };
-        vector<string> labels = { "Multi1PO1+Distance4" };
-
-
         for (string label : labels) {
+            if (Results_stats.contains(label)){ continue; }
             Results_stats[label] = {};
             for (string key : doubles) { Results_stats[label][key] = vector<double>(); }
             for (string key : ints) { Results_stats[label][key] = vector<int>(); }
@@ -389,7 +286,6 @@ int main(int argc, char** argv) {
         Results_stats["Greedy"] = {};
         Results_stats["Greedy"]["Solve time (sec)"] = vector<double>();
         Results_stats["Greedy"]["SObjective value"] = vector<double>();
-
 
 
         for (int test = 0; test < maxTest; test++) {
@@ -515,7 +411,7 @@ int main(int argc, char** argv) {
             //    //data.load(sharedFile, instanceFile, true);
             //    data.load_withLevel2(sharedFile, instanceFile, true, priceProfile::MixedLevel2andLevel3_Perturbed);
 
-            }
+            //    cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
 
             //    {
             //        string label = "Perturbed_Greedy";
@@ -523,24 +419,9 @@ int main(int argc, char** argv) {
             //        G.SetData(data);
             //        G.Solve(false, BUDGET_TYPE::Knapsack);
 
-
-
-            //{
-            //    string label = "MultiB1";
-            //    json params = { {"multicut", multicuts::Multi1B1}, {"heuristic", useHeuristic::Warmstart}, { "verbose", true } };
-            //    Model_Multicut mdl;
-            //    mdl.SetData(data);
-            //    cout << "Method: " << label << endl;
-            //    mdl.Solve(params);
-            //    Results_objs[label].push_back(mdl.ObjectiveValue);
-            //    Results_times[label].push_back(mdl.SolveTime);
-            //    Results_gaps[label].push_back(mdl.OptimalityGap);
-            //    for (pair<string, int> res : mdl.stats) {
-            //        string category = res.first;
-            //        int value = res.second;
-            //        Results_stats[label][category].push_back(value);
+            //        Results_stats[label]["Solve time (sec)"].push_back(G.SolveTime);
+            //        Results_stats[label]["Objective value"].push_back(G.SolutionQuality);
             //    }
-
             //    {
             //        string label = "Perturbed_LocalBranching";
             //        if (!(Results_stats.contains(label))) { throw std::runtime_error("Label missing from JSON. Add label to labels vector."); }
@@ -557,204 +438,12 @@ int main(int argc, char** argv) {
             //        }
             //        cout << endl;
 
-
-            //}
-
-            //{
-            //    string label = "Multi1B1_ImprovedTrust2";
-            //    json params = { {"multicut", multicuts::Multi1B1}, {"heuristic", useHeuristic::Warmstart}, {"use_trust", true},  {"trust_threshold", 2}, { "verbose", true } };
-            //    Model_Multicut mdl;
-            //    mdl.SetData(data);
-            //    cout << "Method: " << label << endl;
-            //    mdl.Solve(params);
-            //    Results_objs[label].push_back(mdl.ObjectiveValue);
-            //    Results_times[label].push_back(mdl.SolveTime);
-            //    Results_gaps[label].push_back(mdl.OptimalityGap);
-            //    for (pair<string, int> res : mdl.stats) {
-            //        string category = res.first;
-            //        int value = res.second;
-            //        Results_stats[label][category].push_back(value);
             //    }
-
-            //}
-
-            //{
-            //    string label = "SingleB1_Trust5";
-            //    json params = { {"multicut", multicuts::SingleB1}, {"heuristic", useHeuristic::Warmstart}, {"use_trust", true},  {"trust_threshold", 5}, { "verbose", true } };
-            //    Model_Multicut mdl;
-            //    mdl.SetData(data);
-            //    cout << "Method: " << label << endl;
-            //    mdl.Solve(params);
-            //    Results_objs[label].push_back(mdl.ObjectiveValue);
-            //    Results_times[label].push_back(mdl.SolveTime);
-            //    Results_gaps[label].push_back(mdl.OptimalityGap);
-            //    for (pair<string, int> res : mdl.stats) {
-            //        string category = res.first;
-            //        int value = res.second;
-            //        Results_stats[label][category].push_back(value);
-            //    }
-
-            //}
-
-
-            //{
-            //    string label = "SingleB1_Trust10";
-            //    json params = { {"multicut", multicuts::SingleB1}, {"heuristic", useHeuristic::Warmstart}, {"use_trust", true},  {"trust_threshold", 10}, { "verbose", true } };
-            //    Model_Multicut mdl;
-            //    mdl.SetData(data);
-            //    cout << "Method: " << label << endl;
-            //    mdl.Solve(params);
-            //    Results_objs[label].push_back(mdl.ObjectiveValue);
-            //    Results_times[label].push_back(mdl.SolveTime);
-            //    Results_gaps[label].push_back(mdl.OptimalityGap);
-            //    for (pair<string, int> res : mdl.stats) {
-            //        string category = res.first;
-            //        int value = res.second;
-            //        Results_stats[label][category].push_back(value);
-            //    }
-
-            //}
-
-
-            //if (test > 12) {
-            //    string label = "Multi1B1";
-            //    json params = { {"multicut", multicuts::Multi1B1}, { "verbose", true } };
-            //    Model_Multicut mdl;
-            //    mdl.SetData(data);
-            //    cout << "Method: " << label << endl;
-            //    mdl.Solve(params);
-            //    Results_objs[label].push_back(mdl.ObjectiveValue);
-            //    Results_times[label].push_back(mdl.SolveTime);
-            //    Results_gaps[label].push_back(mdl.OptimalityGap);
-            //    for (pair<string, int> res : mdl.stats) {
-            //        string category = res.first;
-            //        int value = res.second;
-            //        Results_stats[label][category].push_back(value);
-            //    }
-
-            //}
-
-            //if (test > 11) {
-            //    string label = "Multi1B2";
-            //    json params = { {"multicut", multicuts::Multi1B2}, { "verbose", true } };
-            //    Model_Multicut mdl;
-            //    mdl.SetData(data);
-            //    cout << "Method: " << label << endl;
-            //    mdl.Solve(params);
-            //    Results_objs[label].push_back(mdl.ObjectiveValue);
-            //    Results_times[label].push_back(mdl.SolveTime);
-            //    Results_gaps[label].push_back(mdl.OptimalityGap);
-            //    for (pair<string, int> res : mdl.stats) {
-            //        string category = res.first;
-            //        int value = res.second;
-            //        Results_stats[label][category].push_back(value);
-            //    }
-
-            //}
-
-            //{
-            //    string label = "Multi2B1";
-            //    json params = { {"multicut", multicuts::Multi2B1}, { "verbose", true } };
-            //    Model_Multicut mdl;
-            //    mdl.SetData(data);
-            //    cout << "Method: " << label << endl;
-            //    mdl.Solve(params);
-            //    Results_objs[label].push_back(mdl.ObjectiveValue);
-            //    Results_times[label].push_back(mdl.SolveTime);
-            //    Results_gaps[label].push_back(mdl.OptimalityGap);
-            //    for (pair<string, int> res : mdl.stats) {
-            //        string category = res.first;
-            //        int value = res.second;
-            //        Results_stats[label][category].push_back(value);
-            //    }
-
-            //}
-
-            //{
-            //    string label = "Multi2B2";
-            //    json params = { {"multicut", multicuts::Multi2B2}, { "verbose", true } };
-            //    Model_Multicut mdl;
-            //    mdl.SetData(data);
-            //    cout << "Method: " << label << endl;
-            //    mdl.Solve(params);
-            //    Results_objs[label].push_back(mdl.ObjectiveValue);
-            //    Results_times[label].push_back(mdl.SolveTime);
-            //    Results_gaps[label].push_back(mdl.OptimalityGap);
-            //    for (pair<string, int> res : mdl.stats) {
-            //        string category = res.first;
-            //        int value = res.second;
-            //        Results_stats[label][category].push_back(value);
-            //    }
-
-            //}
-
-            //{
-            //    string label = "Multi3B1";
-            //    json params = { {"multicut", multicuts::Multi3B1}, { "verbose", true } };
-            //    Model_Multicut mdl;
-            //    mdl.SetData(data);
-            //    cout << "Method: " << label << endl;
-            //    mdl.Solve(params);
-            //    Results_objs[label].push_back(mdl.ObjectiveValue);
-            //    Results_times[label].push_back(mdl.SolveTime);
-            //    Results_gaps[label].push_back(mdl.OptimalityGap);
-            //    for (pair<string, int> res : mdl.stats) {
-            //        string category = res.first;
-            //        int value = res.second;
-            //        Results_stats[label][category].push_back(value);
-            //    }
-
-            //}
-
-            //{
-            //    string label = "Multi3B2";
-            //    json params = { {"multicut", multicuts::Multi3B2}, { "verbose", true } };
-            //    Model_Multicut mdl;
-            //    mdl.SetData(data);
-            //    cout << "Method: " << label << endl;
-            //    mdl.Solve(params);
-            //    Results_objs[label].push_back(mdl.ObjectiveValue);
-            //    Results_times[label].push_back(mdl.SolveTime);
-            //    Results_gaps[label].push_back(mdl.OptimalityGap);
-            //    for (pair<string, int> res : mdl.stats) {
-            //        string category = res.first;
-            //        int value = res.second;
-            //        Results_stats[label][category].push_back(value);
-            //    }
-
-            //}
-
-
-            //{
-            //    string label = "SingleB2_Warmstart";
-            //    json params = { {"multicut", multicuts::SingleB2}, {"heuristic", useHeuristic::Warmstart}, { "verbose", true } };
-            //    Model_Multicut mdl;
-            //    mdl.SetData(data);
-            //    cout << "Method: " << label << endl;
-            //    mdl.Solve(params);
-            //    Results_objs[label].push_back(mdl.ObjectiveValue);
-            //    Results_times[label].push_back(mdl.SolveTime);
-            //    Results_gaps[label].push_back(mdl.OptimalityGap);
-            //    for (pair<string, int> res : mdl.stats) {
-            //        string category = res.first;
-            //        int value = res.second;
-            //        Results_stats[label][category].push_back(value);
-            //    }
-
             //}
 
             cout << "\n" << endl;
 
             {
-                //std::ofstream f1(fp_times);
-                //f1 << std::setw(3) << (json) Results_times << std::endl;
-                //f1.close();
-                //std::ofstream f2(fp_objs);
-                //f2 << std::setw(3) << (json) Results_objs << std::endl;
-                //f2.close();
-                //std::ofstream f3(fp_gaps);
-                //f3 << std::setw(3) << (json) Results_gaps << std::endl;
-                //f3.close();
                 std::ofstream f4(fp_stats);
                 f4 << std::setw(3) << (json) Results_stats << std::endl;
                 f4.close();
