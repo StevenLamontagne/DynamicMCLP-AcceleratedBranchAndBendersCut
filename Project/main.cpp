@@ -107,9 +107,11 @@ int main(int argc, char** argv) {
 
     time_t start;
     time(&start);
-    string file = "MC0_Price.json";
-    Data_Improved data;
-    data.load(basefile, file, true);
+    string path = "C:\\Users\\dobby\\Desktop\\Git Hub repo\\Charging-Station_Cpp\\";
+    string shared = path + "Shared_Home.json";
+    string instance = path + "MC0_Home_compressed.json";
+    Data data;
+    data.load(shared, instance, true);
     std::cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
     //std::cout << "Precovered: " << data.Precovered[0] + data.Precovered[1] + data.Precovered[2] + data.Precovered[3] << endl;
 
@@ -122,47 +124,47 @@ int main(int argc, char** argv) {
     }
 
 
-    //{
-    //    string label = "BranchAndCut";
-    //    json params = { { "verbose", true }, {"budgetType", BUDGET_TYPE::OutletCount} };
-    //    BranchAndCut_Model mdl;
-    //    mdl.SetData(data);
-    //    cout << "Method: " << label << endl;
-    //    mdl.Solve(params);
-    //    //for (pair<string, int> res : mdl.stats) {
-    //    //    string category = res.first;
-    //    //    int value = res.second;
-    //    //    cout << category + ": " << value << endl;
-    //    //}
-    //    json final = ConvertMap(mdl.stats);
-    //    for (auto& el : final.items())
-    //    {
-    //        temp[el.key()].push_back(el.value());
-    //        std::cout << el.key() << ": " << el.value() << '\n';
-    //    }
-    //    std::cout << endl << endl;
-    //}
+    {
+        string label = "BranchAndCut";
+        json params = { { "verbose", true }, {"budgetType", BUDGET_TYPE::Knapsack} };
+        BranchAndCut_Model mdl;
+        mdl.SetData(data);
+        cout << "Method: " << label << endl;
+        mdl.Solve(params);
+        //for (pair<string, int> res : mdl.stats) {
+        //    string category = res.first;
+        //    int value = res.second;
+        //    cout << category + ": " << value << endl;
+        //}
+        json final = ConvertMap(mdl.stats);
+        for (auto& el : final.items())
+        {
+            temp[el.key()].push_back(el.value());
+            std::cout << el.key() << ": " << el.value() << '\n';
+        }
+        std::cout << endl << endl;
+    }
 
-    //{
-    //    string label = "SingleCutBenders";
-    //    json params = { { "verbose", true } };
-    //    SingleCutBenders_Model mdl;
-    //    mdl.SetData(data);
-    //    cout << "Method: " << label << endl;
-    //    mdl.Solve(params);
-    //    //for (pair<string, int> res : mdl.stats) {
-    //    //    string category = res.first;
-    //    //    int value = res.second;
-    //    //    cout << category + ": " << value << endl;
-    //    //}
-    //    json final = ConvertMap(mdl.stats);
-    //    for (auto& el : final.items())
-    //    {
-    //        temp[el.key()].push_back(el.value());
-    //        std::cout << el.key() << ": " << el.value() << '\n';
-    //    }
-    //    std::cout << endl << endl;
-    //}
+    {
+        string label = "SingleCutBenders";
+        json params = { { "verbose", true } };
+        SingleCutBenders_Model mdl;
+        mdl.SetData(data);
+        cout << "Method: " << label << endl;
+        mdl.Solve(params);
+        //for (pair<string, int> res : mdl.stats) {
+        //    string category = res.first;
+        //    int value = res.second;
+        //    cout << category + ": " << value << endl;
+        //}
+        json final = ConvertMap(mdl.stats);
+        for (auto& el : final.items())
+        {
+            temp[el.key()].push_back(el.value());
+            std::cout << el.key() << ": " << el.value() << '\n';
+        }
+        std::cout << endl << endl;
+    }
 
     {
         string label = "MultiCutBenders";
