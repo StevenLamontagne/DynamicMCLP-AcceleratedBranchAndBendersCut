@@ -64,3 +64,6 @@ MC0_Price.json
 Shared.json
 MC0_Compressed.json
 Test.json
+*.json
+
+

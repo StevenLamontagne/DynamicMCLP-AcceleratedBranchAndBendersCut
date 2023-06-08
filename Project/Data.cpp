@@ -2,110 +2,25 @@
 
 
 
-using namespace std;
-
-void Data::load(string i, bool verbose)
-{   
-    if (verbose) {
-        cout << "File loading starting \n";
-    }
-	std::ifstream f(i, ifstream::in);
-
-    try
-    {
-        f >> params;
-        T = (int) params["T"];
-        M = (int) params["M"];
-        N = (int) params["N"];
-        for (long unsigned int r = 0; r < params["R"].size(); r++) {
-            R.push_back((int) params["R"][r]);
-        }
-        for (long unsigned int k = 0; k < params["Mj"].size(); k++) {
-            Mj.push_back((int) params["Mj"][k]);
-        }
-
-        //Temp: Just until the new version of the data files is ready
-        vector<vector<vector<double>>> c;
-        for (int t = 0; t < T; t++) {
-            vector <vector<double>> c1;
-            for (int j = 0; j < M; j++) {
-                vector<double> c2;
-                c2.push_back(0);
-                c2.push_back((double)params["c"][t][j] + (double)params["f"][t][j]);
-                for (int k = 2; k < Mj[j]; k++) {
-                    c2.push_back((double)params["c"][t][j]);
-                }
-                c1.push_back(c2);
-            }
-            c.push_back(c1);
-        }
-        params["c"] = c;
-
-        vector<vector<bool>> x0;
-        for (int j = 0; j < M; j++) {
-            vector<bool> x0_1;
-            x0_1.push_back(1);
-            for (int k = 1; k < Mj[j]; k++) {
-                if (params["x0"][j] >= k) {
-                    x0_1.push_back(1);
-                }
-                else {
-                    x0_1.push_back(0);
-                }
-            }
-            x0.push_back(x0_1);
-        }
-        params["x0"] = x0;
-
-
-        if (verbose) {
-            cout << "File loading success \n";
-            cout << "Covering creation started \n";
-        }
-        try {
-            create_covering(verbose);
-        }
-        catch (exception & e) {
-            cout << "Exception: " << e.what() << endl;
-        }
-        if (verbose) {
-            cout << "Covering creation successful \n";
-        }
-    }
-    catch (json::exception & e)
-    {
-        cout << e.what() << '\n';
-    }
-
-	f.close();
-}
-
-void Data::load_compressed(string path, string file, bool verbose)
+void Data::load(string sharedFile, string instanceFile, bool verbose)
 {
     if (verbose) {
         cout << "File loading starting \n";
     }
-    std::ifstream f(path+"Shared.json", ifstream::in);
+    std::ifstream f(sharedFile, ifstream::in);
 
     try
     {
         f >> params;
         T = (int)params["T"];
-        M = (int)params["M"];
-        N = (int)params["N"];
-        for (long unsigned int r = 0; r < params["R"].size(); r++) {
-            R.push_back((int)params["R"][r]);
-        }
-        for (long unsigned int k = 0; k < params["Mj"].size(); k++) {
-            Mj.push_back((int)params["Mj"][k]);
-        }
+        
 
         if (verbose) {
             cout << "File loading success \n";
             cout << "Covering creation started \n";
         }
         try {
-            create_covering_compressed(path, file, verbose);
+            create_covering(instanceFile, verbose);
         }
         catch (exception & e) {
             cout << "Exception: " << e.what() << endl;
@@ -118,401 +33,396 @@ void Data::load_compressed(string path, string file, bool verbose)
     {
         cout << e.what() << '\n';
     }
-   
+
+    params["Stations_isLevel3"] = isLevel3;
+    params["Stations_costMultiplier"] = costMultiplier;
+
+    params["Stations_maxNewOutletsPerTimePeriod"] = 4;
+    params["Stations_maxNewStationsPerTimePeriod"] = 2;
+
 
     f.close();
 
 
 }
 
+void Data::load_fromUtilities(string sharedFile, string instanceFile, bool verbose, priceProfile priceProfile)
+{
+    if (verbose) {
+        cout << "File loading starting \n";
+    }
+    std::ifstream f(sharedFile, ifstream::in);
+
+
+    f >> params;
+    T = (int)params["T"];
+
+    a.clear();
+    Ps.clear();
+    Precovered.clear();
+    M_bar = (int)params["station_coord"].size();
+    int P_est = (int)params["user_coord"].size();
+    for (int t = 0; t < T; t++) {
+        Ps.push_back(Eigen::VectorXd::Zero(M_bar));
+        Precovered.push_back(0.0);
+    }
+
+    if (verbose) {
+        cout << "Loading coverage file \n";
+    }
+
+    params["Stations_isLevel3"] = isLevel3;
+    params["Stations_costMultiplier"] = costMultiplier;
+
+
+    int maxOutlets = 0;
+    for (int j = 0; j < params["M"]; j++) {
+        maxOutlets += (int) params["Mj"][j] - 1;
+    }
+    params["Stations_maxNewOutletsPerTimePeriod"] = 4;
+    params["Stations_maxNewStationsPerTimePeriod"] = 2;
+
+
+    json instance;
+    std::ifstream f2(instanceFile, ifstream::in);
+    f2 >> instance;
+    f2.close();
+
+
+    
+    vector<vector<vector<double>>> c;
+    for (int t = 0; t < T; t++) {
+        vector<vector<double>> c1;
+        for (int j = 0; j < params["M"]; j++) {
+            vector<double> c2;
+            c2.push_back(0.0);
+            
+            for (int k = 1; k < params["Mj"][j]; k++) {
+
+                //Use different price profiles for level 2 versus level 3
+                switch (priceProfile)
+                {
+                case priceProfile::MixedLevel2andLevel3_Unperturbed:
+                {
+                    if (isLevel3[j]) {
+                        double val = 0.0;
+                        if (k % 4 == 1) { val = (double)instance["c"][t][j] + (double)instance["f"][t][j]; }
+                        else { val = (double)instance["c"][t][j]; }
+                        c2.push_back(val);
+                    }
+                    else {
+                        double val = 0.0;
+                        if (k == 1) { val = 0.1 * (double)instance["c"][t][j] + 0.25 * (double)instance["f"][t][j]; }
+                        else { val = 0.1 * (double)instance["c"][t][j]; }
+                        c2.push_back(val);
+                    }
+                    break;
+                }
+                case priceProfile::MixedLevel2andLevel3_Perturbed:
+                {
+                    if (isLevel3[j]) {
+                        double val = 0.0;
+                        if (k % 4 == 1) { val = (double)instance["c"][t][j] + (double)instance["f"][t][j]; }
+                        else { val = (double)instance["c"][t][j]; }
+                        val *= costMultiplier[j]; 
+                        c2.push_back(val);
+                    }
+                    else {
+                        double val = 0.0;
+                        if (k == 1) { val = 0.1 * (double)instance["c"][t][j] + 0.25 * (double)instance["f"][t][j]; }
+                        else { val = 0.1 * (double)instance["c"][t][j]; }
+                        val *= costMultiplier[j]; 
+                        c2.push_back(val);
+                    }
+                    break;
+                }
+                case priceProfile::OnlyLevel3_Perturbed:
+                {
+                    double val = 0.0;
+                    if (k == 1) { val = (double)instance["c"][t][j] + (double)instance["f"][t][j]; }
+                    else { val = (double)instance["c"][t][j]; }
+                    val *= costMultiplier[j];
+                    c2.push_back(val);
+                    break;
+                }
+                case priceProfile::OnlyLevel3_Unperturbed:
+                default:
+                {
+                    double val = 0.0;
+                    if (k == 1) { val = (double)instance["c"][t][j] + (double)instance["f"][t][j]; }
+                    else { val = (double)instance["c"][t][j]; }
+                    c2.push_back(val);
+                    break;
+                }
+                }
+
+            }
+            c1.push_back(c2);
+        }
+        c.push_back(c1);
+    }
+    params["c"] = c;
+
+    vector<vector<bool>> x0;
+    for (int j = 0; j < params["M"]; j++) {
+        vector<bool> x0_1;
+        x0_1.push_back(0);
+        for (int k = 1; k < params["Mj"][j]; k++) {
+            if (instance["x0"][j] >= k) { x0_1.push_back(1); }
+            else { x0_1.push_back(0); }
+        }
+        x0.push_back(x0_1);
+    }
+    params["x0"] = x0;
+
+
+    //Calculate home coverage and station coverage
+    for (int t = 0; t < T; t++) {
+
+        Eigen::Array<bool, Eigen::Dynamic, 1> temp_home = Eigen::Array<bool, Eigen::Dynamic, 1>::Constant(P_est, 0);
+        Eigen::Array<bool, Eigen::Dynamic, Eigen::Dynamic> temp_a = Eigen::Array<bool, Eigen::Dynamic, Eigen::Dynamic>::Constant(P_est, M_bar, 0);
+
+        vector<double> temp_weight;
+        std::vector<Tripletd> tripletList_a;
+        std::vector<Tripletd> tripletList_CutCoeffs;
+        tripletList_a.reserve(P_est);
+        tripletList_CutCoeffs.reserve(P_est);
+
+
+        for (auto p = 0; p < params["user_coord"].size(); p++) {
+            int i = params["user_coord"][p][0];
+            int r = params["user_coord"][p][1];
+            double optout = instance["d0"][t][0][i][r];
+            if ((instance["d0"][t][1][i][r] != nullptr) && (instance["d0"][t][1][i][r] >= optout) ){
+                temp_home(p) = 1;
+            }
+
+            for (auto j_bar = 0; j_bar < params["station_coord"].size(); j_bar++) {
+                int j = params["station_coord"][j_bar][0];
+                int k = params["station_coord"][j_bar][1];
+                if ((k > 1) && (temp_a(p, j_bar - 1))) {continue;}
+                if (instance["d1"][t][j][i][r] != nullptr) {
+                    double d1 = instance["d1"][t][j][i][r]; 
+                    if (((priceProfile == priceProfile::MixedLevel2andLevel3_Perturbed) || (priceProfile == priceProfile::MixedLevel2andLevel3_Unperturbed)) && (!isLevel3[j]))
+                    { d1 -= 1.463601; } //Reduce the value here if the station is level 2 instead of level 3 (by 1.463601, the value calculated by Mahsa)
+                    if (instance["beta"][t][j][i][k] == nullptr) { continue; }
+                    double beta = instance["beta"][t][j][i][k];
+                    double u = beta + d1;
+                    if (u >= optout) { temp_a(p, j_bar) = 1; }
+                }
+            }
+
+            double weight = (double)params["Ni"][t][i] / (double)params["R"][i];
+
+            if (temp_home(p) == 1) { Precovered[t] += weight; continue; }
+
+            Eigen::Array<bool, 1, Eigen::Dynamic> sub = temp_a.row(p);
+            int n = sub.count();
+            switch (n)
+            {
+            case 0:
+                break;
+            case 1:
+            {
+                int j_bar;
+                sub.maxCoeff(&j_bar);
+                int j = params["station_coord"][j_bar][0];
+                int k = params["station_coord"][j_bar][1];
+                if (params["x0"][j][k] == 1) { Precovered[t] += weight; }
+                else { Ps[t](j_bar) += weight; }
+                break;
+            }
+            default:
+            {
+                bool pre = false;
+                int reindex = temp_weight.size();
+                vector<Tripletd> temp_Tripleta;
+                vector<Tripletd> temp_TripletCC;
+                for (int j_bar = 0; j_bar < M_bar; j_bar++) {
+                    if (temp_a(p, j_bar)) {
+                        int j = params["station_coord"][j_bar][0];
+                        int k = params["station_coord"][j_bar][1];
+                        if (params["x0"][j][k] == 1) { Precovered[t] += weight; pre = true; break; }
+                        else { temp_Tripleta.push_back(Tripletd(reindex, j_bar, 1.0)); temp_TripletCC.push_back(Tripletd(reindex, j_bar, weight)); }
+                    }
+                }
+                if (!pre) {
+                    tripletList_a.insert(tripletList_a.end(), temp_Tripleta.begin(), temp_Tripleta.end());
+                    tripletList_CutCoeffs.insert(tripletList_CutCoeffs.end(), temp_TripletCC.begin(), temp_TripletCC.end());
+                    temp_weight.push_back(weight);
+                }
+                break;
+            }
+            }
+
+        }
+
+        P.push_back((int)temp_weight.size());
+        Eigen::VectorXd convert = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(temp_weight.data(), temp_weight.size());
+        weights.push_back(convert);
+
+        SparseXXd new_a(P[t], M_bar);
+        new_a.setFromTriplets(tripletList_a.begin(), tripletList_a.end());
+        new_a.makeCompressed();
+        a.push_back(new_a);
+
+
+        SparseXXd new_CutCoeffs(P[t], M_bar);
+        new_CutCoeffs.setFromTriplets(tripletList_CutCoeffs.begin(), tripletList_CutCoeffs.end());
+        new_CutCoeffs.makeCompressed();
+        CutCoeffs.push_back(new_CutCoeffs);
+
+    }
+
+
+
+
+    f.close();
+}
+
 double Data::SolutionQuality(vector<vector<int>> Sol)
 {
     double total = 0;
     for (int t = 0; t < T; t++) {
-        for (int i = 0; i < N; i++) {
-            double weight = (double)params["Ni"][t][i] / (double)R[i];
-            double subtotal = 0;
-            for (int r = 0; r < R[i]; r++) {
-                bool covered = home[t][i][r];
-                for (int j = 0; j < M; j++) {
-                    for (int k = 0; k < Mj[j]; k++) {
-                        if ((Sol[t][j] >= k) && a[t][i][r][j][k]) {
-                            covered = true;
-                            break;
-                        }
-                    }
-                    if (covered) { break; }
-                }
-
-                if (covered) { subtotal += weight; }
-
-            }
-            total += subtotal;
+        VectorXd cover = VectorXd::Constant(P[t], 0.0);
+        for (int j_bar = 0; j_bar < M_bar; j_bar++) {
+            int j = params["station_coord"][j_bar][0];
+            int k = params["station_coord"][j_bar][1];
+            if (Sol[t][j] >= k) { 
+                cover += a[t].col(j_bar); 
+                total += Ps[t](j_bar); }
         }
+        total += weights[t].dot((VectorXd)(cover.array() >= 1).matrix().cast<double>());
+        total += Precovered[t];
+    }
+    return total;
+}
+
+double Data::SolutionQuality(ArrayXXd Sol)
+{
+    double total = 0;
+    for (int t = 0; t < T; t++) {
+        VectorXd cover = VectorXd::Constant(P[t], 0.0);
+        for (int j_bar = 0; j_bar < M_bar; j_bar++) {
+            int j = params["station_coord"][j_bar][0];
+            int k = params["station_coord"][j_bar][1];
+            if (Sol(t,j) >= k) {
+                cover += a[t].col(j_bar);
+                total += Ps[t](j_bar);
+            }
+        }
+        total += weights[t].dot((VectorXd)(cover.array() >= 1).matrix().cast<double>());
+        total += Precovered[t];
     }
     return total;
 }
 
 
-void Data::create_covering(bool verbose)
+void Data::create_covering(string instanceFile, bool verbose)
 {
     a.clear();
-    home.clear();
-    P.clear();
-    cover_triplet.clear();
+    Ps.clear();
+    Precovered.clear();
 
-    //Calculate home coverage and station coverage
-    for (int t = 0; t < T;t++) {
-        vector<vector<vector<vector<bool>>>> a1;
-        vector<vector<bool>> home1;
-        for (int i = 0; i < N; i++) {
-            vector<vector<vector<bool>>> a2;
-            vector<bool> home2;
-            for (int r = 0; r < R[i]; r++) {
-                vector<vector<bool>> a3;
-                double optout = params["d0"][t][0][i][r];
-                if (params["d0"][t][1][i][r] == nullptr) {
-                    home2.push_back(0);
-                }
-                else {
-                    double u_home = params["d0"][t][1][i][r];
-                    if (u_home >= optout) {
-                        home2.push_back(1);
-                    }
-                    else {
-                        home2.push_back(0);
-                    }
-                }
-                for (int j = 0; j < M; j++) {
-                    vector<bool> a4;
-                    a4.push_back(0);
-                    if (params["d1"][t][j][i][r] == nullptr) {
-                        for (int k = 1; k < Mj[j]; k++) {
-                            a4.push_back(0);
-                        }
-                    }
-                    else {
-                        double d1 = params["d1"][t][j][i][r];
-                        bool isCovered = false;
-                        for (int k = 1; k < Mj[j]; k++) {
-                            if (isCovered) { a4.push_back(0); continue; }
-                            if (params["beta"][t][j][i][k] == nullptr) {
-                                a4.push_back(0);
-                            }
-                            else {                         
-                                double beta = params["beta"][t][j][i][k];
-                                double u = beta + d1;
-                                if (u >= optout) {
-                                    a4.push_back(1);
-                                    isCovered = true;
-                                }
-                                else {
-                                    a4.push_back(0);
-                                }
-                            }
-
-                        }            
-                    }
-                    a3.push_back(a4);
-                }
-                a2.push_back(a3);    
-            }
-            a1.push_back(a2);
-            home1.push_back(home2); 
-        }
-        a.push_back(a1);
-        home.push_back(home1);
-    }
-    
-
-    //Precompute coverage and type of each triplet
-    for (int t = 0; t < T; t++) {
-        vector<vector<triplet>> P1;
-        vector<vector<vector<pair<int, int>>>> cover1;
-        for (int i = 0; i < N; i++) {
-            vector<triplet> P2;
-            vector<vector<pair<int, int>>> cover2;
-            for (int r = 0; r < R[i]; r++) {
-                vector<pair<int, int>> cover3;
-                for (int j = 0; j < M; j++) {
-                    for (int k = 1; k < Mj[j]; k++) {
-                        if (a[t][i][r][j][k] == 1) {
-                            cover3.push_back(make_pair(j, k));
-                            break;
-                        }
-                    }
-                }
-         
-                if (home[t][i][r] == 1) {
-                    P2.push_back(triplet::Precovered);
-                }
-                else {
-                    int s = cover3.size();
-                    switch (s)
-                    {
-                    case 0:
-                        P2.push_back(triplet::Uncoverable);
-                        //cover3.push_back(make_pair(-1, -1));
-                        break;
-                    case 1:
-                        P2.push_back(triplet::Single);
-                        
-                        break;
-                    default:
-                        P2.push_back(triplet::Multi);
-                        break;
-                    }
-                }
-                cover2.push_back(cover3);
-            }
-            P1.push_back(P2);
-            cover1.push_back(cover2);
-        }
-        P.push_back(P1);
-        cover_triplet.push_back(cover1);
-    }
-
-    //Calculate coverage and overlap
-    for (int t = 0; t < T; t++) {
-        vector<vector<vector<pair<int, int>>>> cover_station1;
-        for (int j1 = 0; j1 < M; j1++) {
-            vector<vector<pair<int, int>>> cover_station2;
-            for (int k1 = 0; k1 < Mj[j1]; k1++) {
-                vector<pair<int, int>> cover_station3;
-                cover_station2.push_back(cover_station3);
-            }
-            cover_station1.push_back(cover_station2);
-        }
-        cover_station.push_back(cover_station1);
-
-        for (int i = 0; i < N; i++) {
-            for (int r = 0; r < R[i]; r++) {
-                switch (P[t][i][r])
-                {
-                case triplet::Uncoverable:
-                case triplet::Precovered: {
-                    continue;
-                    break;
-                }
-                default:
-                {
-                    for (pair<int, int> cover_triplet : cover_triplet[t][i][r]) {
-                        int j = cover_triplet.first;
-                        int k = cover_triplet.second;
-                        //if (j >= 8|| k >= 4) {
-                        //	cout << "High element found";
-                        //}
-                        cover_station[t][j][k].push_back(make_pair(i, r));
-                    }
-                    break;
-                }
-                }
-
-            }
-        }
-
-
-        map<pair<int, int>, map<pair<int, int>, double>> overlap1;
-        for (int j1 = 0; j1 < M; j1++) {
-            int total = 0;
-            vector<pair<int, int>> covered;
-            for (int k1 = 1; k1 < Mj[j1]; k1++) {
-                map<pair<int, int>, double> overlap2;
-                total += cover_station[t][j1][k1].size();
-                covered.insert(covered.end(), cover_station[t][j1][k1].begin(), cover_station[t][j1][k1].end());
-                for (int j2 = 0; j2 < M; j2++) {
-                    if (j1 == j2) { continue; }
-                    for (int k2 = 1; k2 < Mj[j2]; k2++) {
-                        int over = 0;
-                        for (pair<int, int> trip : covered) {
-                            int i = trip.first;
-                            int r = trip.second;
-                            if (a[t][i][r][j2][k2]) { over += 1; } //not very efficient, since recalculating a ton of stuff. But works for now
-                        }
-                        overlap2[make_pair(j2, k2)] = (double)over / (double)total;
-                    }
-                }
-                overlap1[make_pair(j1, k1)] = overlap2;
-            }
-        }
-        overlap.push_back(overlap1);
-
-
-    }
-
-
-}
-
-void Data::create_covering_compressed(string path, string file, bool verbose)
-{
     if (verbose) {
         cout << "Loading coverage file \n";
     }
-    
 
-    json temp;
-    std::ifstream f2(path + file, ifstream::in);
-    f2 >> temp;
+
+    json temp_coverage;
+    std::ifstream f2(instanceFile, ifstream::in);
+    f2 >> temp_coverage;
     f2.close();
 
-
-    a.clear();
-    home.clear();
-    P.clear();
-    cover_triplet.clear();
-
-    //Calculate home coverage and station coverage
+    M_bar = (int) params["station_coord"].size();
+    int P_est = (int) params["user_coord"].size();
     for (int t = 0; t < T; t++) {
-        vector<vector<vector<vector<bool>>>> a1;
-        vector<vector<bool>> home1;
-        for (int i = 0; i < N; i++) {
-            vector<vector<vector<bool>>> a2;
-            vector<bool> home2;
-            for (int r = 0; r < R[i]; r++) {
-                vector<vector<bool>> a3;
-                home2.push_back(0);
-                for (int j = 0; j < M; j++) {
-                    vector<bool> a4;
-                    for (int k = 0; k < Mj[j]; k++) {
-                        a4.push_back(0);
-                    }              
-                    a3.push_back(a4);
-                }
-                a2.push_back(a3);
-            }
-            a1.push_back(a2);
-            home1.push_back(home2);
-        }
-        a.push_back(a1);
-        home.push_back(home1);
+        Ps.push_back(Eigen::VectorXd::Zero(M_bar));
+        Precovered.push_back(0.0);
     }
 
+
     for (int t = 0; t < T; t++) {
-        for (int coord : temp["Home"][t]) {
+        Eigen::Array<bool, Eigen::Dynamic, 1> temp_home = Eigen::Array<bool, Eigen::Dynamic, 1>::Constant(P_est, 0);
+        Eigen::Array<bool, Eigen::Dynamic, Eigen::Dynamic> temp_a = Eigen::Array<bool, Eigen::Dynamic, Eigen::Dynamic>::Constant(P_est, M_bar, 0);
+
+        vector<double> temp_weight;
+        std::vector<Tripletd> tripletList_a;
+        std::vector<Tripletd> tripletList_CutCoeffs;
+        tripletList_a.reserve(P_est);
+        tripletList_CutCoeffs.reserve(P_est);
+
+        for (int coord : temp_coverage["Home"][t]) {
+            temp_home(coord) = 1;
+        }
+
+        for (vector<int> coord : temp_coverage["a"][t]) {
+            temp_a(coord[0],coord[1]) = 1;
+        }
+
+
+        for (int coord = 0; coord < P_est; coord++) {
+
             int i = params["user_coord"][coord][0];
             int r = params["user_coord"][coord][1];
-            home[t][i][r] = 1;
-        }
+            double weight = (double)params["Ni"][t][i] / (double)params["R"][i];
 
-        for (vector<int> coord : temp["a"][t]) {
-            int i = params["user_coord"][coord[0]][0];
-            int r = params["user_coord"][coord[0]][1];
-            int j = params["station_coord"][coord[1]][0];
-            int k = params["station_coord"][coord[1]][1];
-            a[t][i][r][j][k] = 1;
-        }
-    }
-    //Precompute coverage and type of each triplet
-    for (int t = 0; t < T; t++) {
-        vector<vector<triplet>> P1;
-        vector<vector<vector<pair<int, int>>>> cover1;
-        for (int i = 0; i < N; i++) {
-            vector<triplet> P2;
-            vector<vector<pair<int, int>>> cover2;
-            for (int r = 0; r < R[i]; r++) {
-                vector<pair<int, int>> cover3;
-                for (int j = 0; j < M; j++) {
-                    for (int k = 1; k < Mj[j]; k++) {
-                        if (a[t][i][r][j][k] == 1) {
-                            cover3.push_back(make_pair(j, k));
-                            break;
-                        }
+            if (temp_home(coord) == 1) { Precovered[t] += weight; continue; }
+
+            Eigen::Array<bool, 1, Eigen::Dynamic> sub = temp_a.row(coord);
+            int n = sub.count();
+            switch (n)
+            {
+            case 0:
+                break;
+            case 1:
+            {
+                int j_bar;
+                sub.maxCoeff(&j_bar);
+                int j = params["station_coord"][j_bar][0];
+                int k = params["station_coord"][j_bar][1];
+                if (params["x0"][j][k] == 1) { Precovered[t] += weight; }
+                else { Ps[t](j_bar) += weight; }
+                break;
+            }
+            default:
+            {
+                bool pre = false;
+                int reindex = temp_weight.size();
+                vector<Tripletd> temp_Tripleta;
+                vector<Tripletd> temp_TripletCC;
+                for (int j_bar = 0; j_bar < M_bar; j_bar++) {
+                    if (temp_a(coord, j_bar)) {
+                        int j = params["station_coord"][j_bar][0];
+                        int k = params["station_coord"][j_bar][1];
+                        if (params["x0"][j][k] == 1) { Precovered[t] += weight; pre = true; break; }
+                        else { temp_Tripleta.push_back(Tripletd(reindex, j_bar, 1.0)); temp_TripletCC.push_back(Tripletd(reindex, j_bar, weight)); }
                     }
                 }
-
-                if (home[t][i][r] == 1) {
-                    P2.push_back(triplet::Precovered);
+                if (!pre) {
+                    tripletList_a.insert(tripletList_a.end(), temp_Tripleta.begin(), temp_Tripleta.end());
+                    tripletList_CutCoeffs.insert(tripletList_CutCoeffs.end(), temp_TripletCC.begin(), temp_TripletCC.end());
+                    temp_weight.push_back(weight);
                 }
-                else {
-                    int s = cover3.size();
-                    switch (s)
-                    {
-                    case 0:
-                        P2.push_back(triplet::Uncoverable);
-                        //cover3.push_back(make_pair(-1, -1));
-                        break;
-                    case 1:
-                        P2.push_back(triplet::Single);
-
-                        break;
-                    default:
-                        P2.push_back(triplet::Multi);
-                        break;
-                    }
-                }
-                cover2.push_back(cover3);
+                break;
             }
-            P1.push_back(P2);
-            cover1.push_back(cover2);
-        }
-        P.push_back(P1);
-        cover_triplet.push_back(cover1);
-    }
-
-    //Calculate coverage and overlap
-    for (int t = 0; t < T; t++) {
-        vector<vector<vector<pair<int, int>>>> cover_station1;
-        for (int j1 = 0; j1 < M; j1++) {
-            vector<vector<pair<int, int>>> cover_station2;
-            for (int k1 = 0; k1 < Mj[j1]; k1++) {
-                vector<pair<int, int>> cover_station3;
-                cover_station2.push_back(cover_station3);
-            }
-            cover_station1.push_back(cover_station2);
-        }
-        cover_station.push_back(cover_station1);
-
-        for (int i = 0; i < N; i++) {
-            for (int r = 0; r < R[i]; r++) {
-                switch (P[t][i][r])
-                {
-                case triplet::Uncoverable:
-                case triplet::Precovered: {
-                    continue;
-                    break;
-                }
-                default:
-                {
-                    for (pair<int, int> cover_triplet : cover_triplet[t][i][r]) {
-                        int j = cover_triplet.first;
-                        int k = cover_triplet.second;
-                        //if (j >= 8|| k >= 4) {
-                        //	cout << "High element found";
-                        //}
-                        cover_station[t][j][k].push_back(make_pair(i, r));
-                    }
-                    break;
-                }
-                }
-
             }
         }
+        
+        P.push_back((int) temp_weight.size());
+        Eigen::VectorXd convert = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(temp_weight.data(), temp_weight.size());
+        weights.push_back(convert);
+
+        SparseXXd new_a(P[t], M_bar);
+        new_a.setFromTriplets(tripletList_a.begin(), tripletList_a.end());
+        new_a.makeCompressed();
+        a.push_back(new_a);
 
 
-        map<pair<int, int>, map<pair<int, int>, double>> overlap1;
-        for (int j1 = 0; j1 < M; j1++) {
-            int total = 0;
-            vector<pair<int, int>> covered;
-            for (int k1 = 1; k1 < Mj[j1]; k1++) {
-                map<pair<int, int>, double> overlap2;
-                total += cover_station[t][j1][k1].size();
-                covered.insert(covered.end(), cover_station[t][j1][k1].begin(), cover_station[t][j1][k1].end());
-                for (int j2 = 0; j2 < M; j2++) {
-                    if (j1 == j2) { continue; }
-                    for (int k2 = 1; k2 < Mj[j2]; k2++) {
-                        int over = 0;
-                        for (pair<int, int> trip : covered) {
-                            int i = trip.first;
-                            int r = trip.second;
-                            if (a[t][i][r][j2][k2]) { over += 1; } //not very efficient, since recalculating a ton of stuff. But works for now
-                        }
-                        overlap2[make_pair(j2, k2)] = (double)over / (double)total;
-                    }
-                }
-                overlap1[make_pair(j1, k1)] = overlap2;
-            }
-        }
-        overlap.push_back(overlap1);
+        SparseXXd new_CutCoeffs(P[t], M_bar);
+        new_CutCoeffs.setFromTriplets(tripletList_CutCoeffs.begin(), tripletList_CutCoeffs.end());
+        new_CutCoeffs.makeCompressed();
+        CutCoeffs.push_back(new_CutCoeffs);
 
 
     }
