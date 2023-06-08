@@ -99,6 +99,17 @@ void MultiCutBenders_Model::Solve(json params)
 				budget.end();
 			}
 			break;
+
+
+			//for (int t = 0; t < T; t++) {
+			//	IloExpr cover(env);
+			//	for (int j_bar = 0; j_bar < M_bar; j_bar++) {
+			//		if (data.params["station_coord"][j_bar][1] == 1) { cover += x[t][j_bar]; }
+			//	}
+			//	model.add(cover <= 2);
+			//	cover.end();
+			//}
+
 		}
 		case BUDGET_TYPE::OutletCount:
 		{

@@ -86,6 +86,9 @@ json ConvertMap(map<string, int> stats) {
     if (temp.contains("nDiversified")) {
         final["Number of diversified subproblems"] = (int)temp.value("nDiversified", -1);
     }
+    if (temp.contains("nManualBranches")) {
+        final["Number of local branching separations"] = (int)temp.value("nManualBranches", -1);
+    }
     if (temp.contains("GRASP cut time (x100)")) {
         final["GRASP cut time (sec)"] = (double)temp.value("GRASP cut time (x100)", -1) / 100;
     }
@@ -140,9 +143,9 @@ int main(int argc, char** argv) {
     Data data;
     //data.load_fromUtilities(sharedFile, instanceFile, true, priceProfile::OnlyLevel3_Unperturbed);
     data.load(sharedFile, instanceFile, true);
-    //data.params["Stations_maxNewOutletsPerTimePeriod"] = 4;
-    //data.params["Stations_maxNewStationsPerTimePeriod"] = 1;
-    data.T = 2;
+    data.params["Stations_maxNewOutletsPerTimePeriod"] = 4;
+    data.params["Stations_maxNewStationsPerTimePeriod"] = 2;
+    //data.T = 2;
 
     std::cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
     //std::cout << "Precovered: " << data.Precovered[0] + data.Precovered[1] + data.Precovered[2] + data.Precovered[3] << endl;
@@ -156,47 +159,47 @@ int main(int argc, char** argv) {
     }
 
 
-    {
-        string label = "BranchAndCut";
-        json params = { { "verbose", true } };
-        BranchAndCut_Model mdl;
-        mdl.SetData(data);
-        cout << "Method: " << label << endl;
-        mdl.Solve(params);
-        //for (pair<string, int> res : mdl.stats) {
-        //    string category = res.first;
-        //    int value = res.second;
-        //    cout << category + ": " << value << endl;
-        //}
-        json final = ConvertMap(mdl.stats);
-        for (auto& el : final.items())
-        {
-            temp[el.key()].push_back(el.value());
-            std::cout << el.key() << ": " << el.value() << '\n';
-        }
-        std::cout << endl << endl;
-    }
+    //{
+    //    string label = "BranchAndCut";
+    //    json params = { { "verbose", true }, {"budgetType", BUDGET_TYPE::OutletCount} };
+    //    BranchAndCut_Model mdl;
+    //    mdl.SetData(data);
+    //    cout << "Method: " << label << endl;
+    //    mdl.Solve(params);
+    //    //for (pair<string, int> res : mdl.stats) {
+    //    //    string category = res.first;
+    //    //    int value = res.second;
+    //    //    cout << category + ": " << value << endl;
+    //    //}
+    //    json final = ConvertMap(mdl.stats);
+    //    for (auto& el : final.items())
+    //    {
+    //        temp[el.key()].push_back(el.value());
+    //        std::cout << el.key() << ": " << el.value() << '\n';
+    //    }
+    //    std::cout << endl << endl;
+    //}
 
-    {
-        string label = "SingleCutBenders";
-        json params = { { "verbose", true } };
-        SingleCutBenders_Model mdl;
-        mdl.SetData(data);
-        cout << "Method: " << label << endl;
-        mdl.Solve(params);
-        //for (pair<string, int> res : mdl.stats) {
-        //    string category = res.first;
-        //    int value = res.second;
-        //    cout << category + ": " << value << endl;
-        //}
-        json final = ConvertMap(mdl.stats);
-        for (auto& el : final.items())
-        {
-            temp[el.key()].push_back(el.value());
-            std::cout << el.key() << ": " << el.value() << '\n';
-        }
-        std::cout << endl << endl;
-    }
+    //{
+    //    string label = "SingleCutBenders";
+    //    json params = { { "verbose", true } };
+    //    SingleCutBenders_Model mdl;
+    //    mdl.SetData(data);
+    //    cout << "Method: " << label << endl;
+    //    mdl.Solve(params);
+    //    //for (pair<string, int> res : mdl.stats) {
+    //    //    string category = res.first;
+    //    //    int value = res.second;
+    //    //    cout << category + ": " << value << endl;
+    //    //}
+    //    json final = ConvertMap(mdl.stats);
+    //    for (auto& el : final.items())
+    //    {
+    //        temp[el.key()].push_back(el.value());
+    //        std::cout << el.key() << ": " << el.value() << '\n';
+    //    }
+    //    std::cout << endl << endl;
+    //}
 
     {
         string label = "MultiCutBenders";
@@ -254,28 +257,24 @@ int main(int argc, char** argv) {
     {
         cout << "Dataset: " << dataset << endl;
         std::string resultspath = "/local_1/outer/lamste/Results/TroisRivieres/C++/" + dataset + "/";
-        string prefix = "Baseline";
+        string prefix = "TwoYear";
         std::string fp_stats = resultspath + prefix + "_Statistics.json";
 
         
         std::string basefile = "/local_1/outer/lamste/Data/Precomputed/" + dataset + "/MaximumCover/";
         string sharedFile = basefile + "Shared.json";
         json Results_stats;
-        //{
-        //    json Results;
-        //    std::ifstream f(fp_stats, ifstream::in);
-        //    f >> Results;
-        //    f.close();
-        //    Results_stats = Results;
-        //}
-
+        {
+            json Results;
+            std::ifstream f(fp_stats, ifstream::in);
+            f >> Results;
+            f.close();
+            Results_stats = Results;
+        }
         vector<string> doubles = { "Solve time, LP (sec)" , "Solve time, MIP (sec)", "Objective value" , "Optimality gap (%)" , "Average lazy cut time (sec)" , "Average user cut time (sec)" };
-        vector<string> ints = { "Number of nodes" , "Number of lazy cuts" , "Number of user cuts", "Number of restricted subproblems", "Number of diversified subproblems" };
+        vector<string> ints = { "Number of nodes" , "Number of lazy cuts" , "Number of user cuts", "Number of restricted subproblems", "Number of diversified subproblems", "Number of local branching separations" };
         vector<string> strings = { "Cplex status" };
-
-
-        vector<string> labels = {"BranchAndCut", "SingleCutBenders", "MultiCutBenders", "LocalBranching"};
-
+        vector<string> labels = {"LocalBranching_Cutting"};
         for (string label : labels) {
             if (Results_stats.contains(label)){ continue; }
             Results_stats[label] = {};
@@ -283,9 +282,9 @@ int main(int argc, char** argv) {
             for (string key : ints) { Results_stats[label][key] = vector<int>(); }
             for (string key : strings) { Results_stats[label][key] = vector<string>(); }
         }
-        Results_stats["Greedy"] = {};
-        Results_stats["Greedy"]["Solve time (sec)"] = vector<double>();
-        Results_stats["Greedy"]["SObjective value"] = vector<double>();
+        //Results_stats["Greedy"] = {};
+        //Results_stats["Greedy"]["Solve time (sec)"] = vector<double>();
+        //Results_stats["Greedy"]["Objective value"] = vector<double>();
 
 
         for (int test = 0; test < maxTest; test++) {
@@ -298,94 +297,96 @@ int main(int argc, char** argv) {
             time(&start);
             Data data;
             data.load(sharedFile, instanceFile, true);
+
+            data.T = 2; //Remember to remove this later
             //data.load_fromUtilities(sharedFile, instanceFile, true, priceProfile::OnlyLevel3_Unperturbed);
 
             cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
             cout << endl;
             
                         
+            //{
+            //    string label = "Greedy";
+            //    cout << "Method: " << label << endl;
+
+            //    Greedy G;
+            //    G.SetData(data);
+            //    G.Solve(false, BUDGET_TYPE::Knapsack);
+
+            //    Results_stats[label]["Solve time (sec)"].push_back(G.SolveTime);
+            //    Results_stats[label]["Objective value"].push_back(G.SolutionQuality);
+            //    cout << "Objective value: " << G.SolutionQuality << endl;
+            //    cout << "Solve time: " << G.SolveTime << endl;
+            //    cout << endl;
+
+            //}
+
+            //{
+            //    string label = "BranchAndCut";
+            //    if (!(Results_stats.contains(label))) { throw std::runtime_error("Label missing from JSON. Add label to labels vector."); }
+            //    if (Results_stats[label]["Cplex status"].size() > (long unsigned int) test) { throw std::runtime_error("Results already populated. Check the label is spelled correctly or disable this error."); }
+            //    json params = { { "verbose", true }, {"budgetType", BUDGET_TYPE::Knapsack} };
+            //    BranchAndCut_Model mdl;
+            //    mdl.SetData(data);
+            //    cout << "Method: " << label << endl;
+            //    mdl.Solve(params);
+            //    json final = ConvertMap(mdl.stats);
+            //    //for (auto& el : Results_stats[label].items()) {
+            //    //    if (!final.contains(el.key())) { Results_stats[label].erase(el.key()); }
+            //    //}
+            //    for (auto& el : final.items())
+            //    {
+            //        Results_stats[label][el.key()].push_back(el.value());
+            //    }
+            //    cout << endl;
+
+            //}
+
+            //{
+            //    string label = "SingleCutBenders";
+            //    if (!(Results_stats.contains(label))) { throw std::runtime_error("Label missing from JSON. Add label to labels vector."); }
+            //    if (Results_stats[label]["Cplex status"].size() > (long unsigned int) test) { throw std::runtime_error("Results already populated. Check the label is spelled correctly or disable this error."); }
+            //    json params = { { "verbose", true } };
+            //    SingleCutBenders_Model mdl;
+            //    mdl.SetData(data);
+            //    cout << "Method: " << label << endl;
+            //    mdl.Solve(params);
+            //    json final = ConvertMap(mdl.stats);
+            //    for (auto& el : Results_stats[label].items()) {
+            //        if (!final.contains(el.key())) { Results_stats[label].erase(el.key()); }
+            //    }
+            //    for (auto& el : final.items())
+            //    {
+            //        Results_stats[label][el.key()].push_back(el.value());
+            //    }
+            //    cout << endl;
+
+            //}
+
+
+            //{
+            //    string label = "MultiCutBenders";
+            //    if (!(Results_stats.contains(label))) { throw std::runtime_error("Label missing from JSON. Add label to labels vector."); }
+            //    if (Results_stats[label]["Cplex status"].size() > (long unsigned int) test) { throw std::runtime_error("Results already populated. Check the label is spelled correctly or disable this error."); }
+            //    json params = { { "verbose", true }, {"budgetType", BUDGET_TYPE::Knapsack} };
+            //    MultiCutBenders_Model mdl;
+            //    mdl.SetData(data);
+            //    cout << "Method: " << label << endl;
+            //    mdl.Solve(params);
+            //    json final = ConvertMap(mdl.stats);
+            //    for (auto& el : Results_stats[label].items()) {
+            //        if (!final.contains(el.key())) { Results_stats[label].erase(el.key()); }
+            //    }
+            //    for (auto& el : final.items())
+            //    {
+            //        Results_stats[label][el.key()].push_back(el.value());
+            //    }
+            //    cout << endl;
+
+            //}
+
             {
-                string label = "Greedy";
-                cout << "Method: " << label << endl;
-
-                Greedy G;
-                G.SetData(data);
-                G.Solve(false, BUDGET_TYPE::Knapsack);
-
-                Results_stats[label]["Solve time (sec)"].push_back(G.SolveTime);
-                Results_stats[label]["Objective value"].push_back(G.SolutionQuality);
-                cout << "Objective value: " << G.SolutionQuality << endl;
-                cout << "Solve time: " << G.SolveTime << endl;
-                cout << endl;
-
-            }
-
-            {
-                string label = "BranchAndCut";
-                if (!(Results_stats.contains(label))) { throw std::runtime_error("Label missing from JSON. Add label to labels vector."); }
-                if (Results_stats[label]["Cplex status"].size() > (long unsigned int) test) { throw std::runtime_error("Results already populated. Check the label is spelled correctly or disable this error."); }
-                json params = { { "verbose", true } };
-                BranchAndCut_Model mdl;
-                mdl.SetData(data);
-                cout << "Method: " << label << endl;
-                mdl.Solve(params);
-                json final = ConvertMap(mdl.stats);
-                //for (auto& el : Results_stats[label].items()) {
-                //    if (!final.contains(el.key())) { Results_stats[label].erase(el.key()); }
-                //}
-                for (auto& el : final.items())
-                {
-                    Results_stats[label][el.key()].push_back(el.value());
-                }
-                cout << endl;
-
-            }
-
-            {
-                string label = "SingleCutBenders";
-                if (!(Results_stats.contains(label))) { throw std::runtime_error("Label missing from JSON. Add label to labels vector."); }
-                if (Results_stats[label]["Cplex status"].size() > (long unsigned int) test) { throw std::runtime_error("Results already populated. Check the label is spelled correctly or disable this error."); }
-                json params = { { "verbose", true } };
-                SingleCutBenders_Model mdl;
-                mdl.SetData(data);
-                cout << "Method: " << label << endl;
-                mdl.Solve(params);
-                json final = ConvertMap(mdl.stats);
-                for (auto& el : Results_stats[label].items()) {
-                    if (!final.contains(el.key())) { Results_stats[label].erase(el.key()); }
-                }
-                for (auto& el : final.items())
-                {
-                    Results_stats[label][el.key()].push_back(el.value());
-                }
-                cout << endl;
-
-            }
-
-
-            {
-                string label = "MultiCutBenders";
-                if (!(Results_stats.contains(label))) { throw std::runtime_error("Label missing from JSON. Add label to labels vector."); }
-                if (Results_stats[label]["Cplex status"].size() > (long unsigned int) test) { throw std::runtime_error("Results already populated. Check the label is spelled correctly or disable this error."); }
-                json params = { { "verbose", true }, {"budgetType", BUDGET_TYPE::Knapsack} };
-                MultiCutBenders_Model mdl;
-                mdl.SetData(data);
-                cout << "Method: " << label << endl;
-                mdl.Solve(params);
-                json final = ConvertMap(mdl.stats);
-                for (auto& el : Results_stats[label].items()) {
-                    if (!final.contains(el.key())) { Results_stats[label].erase(el.key()); }
-                }
-                for (auto& el : final.items())
-                {
-                    Results_stats[label][el.key()].push_back(el.value());
-                }
-                cout << endl;
-
-            }
-
-            {
-                string label = "LocalBranching";
+                string label = "LocalBranching_Cutting";
                 if (!(Results_stats.contains(label))) { throw std::runtime_error("Label missing from JSON. Add label to labels vector."); }
                 if (Results_stats[label]["Cplex status"].size() > (long unsigned int) test) { throw std::runtime_error("Results already populated. Check the label is spelled correctly or disable this error."); }
                 json params = { { "verbose", true }, {"budgetType", BUDGET_TYPE::Knapsack} };
@@ -402,7 +403,6 @@ int main(int argc, char** argv) {
                     Results_stats[label][el.key()].push_back(el.value());
                 }
                 cout << endl;
-
             }
 
 

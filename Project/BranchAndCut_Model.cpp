@@ -6,6 +6,7 @@ void BranchAndCut_Model::Solve(json params)
 
 	//Set model parameters
 	verbose = params.value("verbose", false);
+	BUDGET_TYPE budgetType = params.value("budgetType", BUDGET_TYPE::Knapsack);
 
 	//Define constants for easier reading and writing
 	int& T = data.T;
@@ -63,26 +64,104 @@ void BranchAndCut_Model::Solve(json params)
 
 
 	//Constraints
-	////Budget, year 0
-	IloExpr budget0(env);
-	for (int j_bar = 0; j_bar < M_bar; j_bar++) {
-		int j = data.params["station_coord"][j_bar][0];
-		int k = data.params["station_coord"][j_bar][1];
-		budget0 += (double)data.params["c"][0][j][k] * (x[0][j_bar] - (int)data.params["x0"][j][k]);
-	}
-	model.add(budget0 <= (double)data.params["B"][0]);
-	budget0.end();
+	//////Budget, year 0
+	//IloExpr budget0(env);
+	//for (int j_bar = 0; j_bar < M_bar; j_bar++) {
+	//	int j = data.params["station_coord"][j_bar][0];
+	//	int k = data.params["station_coord"][j_bar][1];
+	//	budget0 += (double)data.params["c"][0][j][k] * (x[0][j_bar] - (int)data.params["x0"][j][k]);
+	//}
+	//model.add(budget0 <= (double)data.params["B"][0]);
+	//budget0.end();
 
-	////Budget, year 1+
-	for (int t = 1; t < T; t++) {
-		IloExpr budget(env);
+	//////Budget, year 1+
+	//for (int t = 1; t < T; t++) {
+	//	IloExpr budget(env);
+	//	for (int j_bar = 0; j_bar < M_bar; j_bar++) {
+	//		int j = data.params["station_coord"][j_bar][0];
+	//		int k = data.params["station_coord"][j_bar][1];
+	//		budget += (double)data.params["c"][t][j][k] * (x[t][j_bar] - x[t - 1][j_bar]);
+	//	}
+	//	model.add(budget <= (double)data.params["B"][t]);
+	//	budget.end();
+	//}
+
+		//Constraints
+	switch (budgetType)
+	{
+	case BUDGET_TYPE::Knapsack:
+	{
+		////Budget, year 0
+		IloExpr budget0(env);
 		for (int j_bar = 0; j_bar < M_bar; j_bar++) {
 			int j = data.params["station_coord"][j_bar][0];
 			int k = data.params["station_coord"][j_bar][1];
-			budget += (double)data.params["c"][t][j][k] * (x[t][j_bar] - x[t - 1][j_bar]);
+			budget0 += (double)data.params["c"][0][j][k] * (x[0][j_bar] - (int)data.params["x0"][j][k]);
 		}
-		model.add(budget <= (double)data.params["B"][t]);
-		budget.end();
+		model.add(budget0 <= (double)data.params["B"][0]);
+		budget0.end();
+
+		////Budget, year 1+
+		for (int t = 1; t < T; t++) {
+			IloExpr budget(env);
+			for (int j_bar = 0; j_bar < M_bar; j_bar++) {
+				int j = data.params["station_coord"][j_bar][0];
+				int k = data.params["station_coord"][j_bar][1];
+				budget += (double)data.params["c"][t][j][k] * (x[t][j_bar] - x[t - 1][j_bar]);
+			}
+			model.add(budget <= (double)data.params["B"][t]);
+			budget.end();
+		}
+
+		break;
+	}
+	case BUDGET_TYPE::OutletCount:
+	{
+		////Max outlets installed per time period, year 0 
+		IloExpr outlets0(env);
+		for (int j_bar = 0; j_bar < M_bar; j_bar++) {
+			int j = data.params["station_coord"][j_bar][0];
+			int k = data.params["station_coord"][j_bar][1];
+			outlets0 += x[0][j_bar] - (int)data.params["x0"][j][k];
+		}
+		model.add(outlets0 <= (int)data.params["Stations_maxNewOutletsPerTimePeriod"]);
+		outlets0.end();
+
+		IloExpr stations0(env);
+		for (int j_bar = 0; j_bar < M_bar; j_bar++) {
+			int j = data.params["station_coord"][j_bar][0];
+			int k = data.params["station_coord"][j_bar][1];
+			if (k == 1) { stations0 += x[0][j_bar] - (int)data.params["x0"][j][k]; }
+		}
+		model.add(stations0 <= (int)data.params["Stations_maxNewStationsPerTimePeriod"]);
+		stations0.end();
+
+		////Max outlets installed per time period, year 1+ 
+		for (int t = 1; t < T; t++) {
+			IloExpr outlets(env);
+			for (int j_bar = 0; j_bar < M_bar; j_bar++) {
+				outlets += (x[t][j_bar] - x[t - 1][j_bar]);
+			}
+			model.add(outlets <= (int)data.params["Stations_maxNewOutletsPerTimePeriod"]);
+			outlets.end();
+
+			IloExpr stations(env);
+			for (int j_bar = 0; j_bar < M_bar; j_bar++) {
+				int k = data.params["station_coord"][j_bar][1];
+				if (k == 1) { stations += x[t][j_bar] - x[t - 1][j_bar]; }
+			}
+			model.add(stations <= (int)data.params["Stations_maxNewStationsPerTimePeriod"]);
+			stations.end();
+
+		}
+		break;
+	}
+	default:
+	{
+		cout << "Unrecognised budget type." << endl;
+		throw;
+		break;
+	}
 	}
 
 	////Can't remove outlets, year 0

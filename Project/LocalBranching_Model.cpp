@@ -93,6 +93,7 @@ void LocalBranching_Model::Solve(json params)
 				model.add(budget <= (double)data.params["B"][t]);
 				budget.end();
 			}
+
 			break;
 		}
 		case BUDGET_TYPE::OutletCount:
@@ -224,15 +225,24 @@ void LocalBranching_Model::Solve(json params)
 			}
 
 			MultiCutBenders_Callback cb(data, x, theta);
-			CPXLONG contextmask = IloCplex::Callback::Context::Id::Relaxation;
+			CPXLONG contextmask = IloCplex::Callback::Context::Id::Candidate | IloCplex::Callback::Context::Id::Relaxation;
 			cplex.use(&cb, contextmask);
 			cplex.solve();
 			stats["Solve time, LP (x100)"] = (int)100 * cplex.getTime();
+			stats["Objective value, LP (x100)"] = (int)100 * cplex.getObjValue();
+			cout << "Objective value, LP: " << (double) stats["Objective value, LP (x100)"]/ (double) 100.00 << endl;
 
 			for (auto conv : conv_x) {
 				model.remove(conv);
 			}
 			cplex.deleteMIPStarts(0);
+
+			cplex.use(NULL, 0);
+			//cplex.solve();
+			//stats["MIP objective value, LP (x100)"] = (int)100 * cplex.getObjValue();
+			//cout << "MIP objective value, LP: " << (double)stats["MIP objective value, LP (x100)"] / (double)100.00 << endl;
+
+
 		}
 
 		
@@ -262,42 +272,86 @@ void LocalBranching_Model::Solve(json params)
 
 
 		//Link local branching callback
-		LocalBranching_Callback cb(data, model, x, theta, theta_obj, trust);
-		CPXLONG contextmask = IloCplex::Callback::Context::Id::Candidate
-		| IloCplex::Callback::Context::Id::Relaxation;
-		cplex.use(&cb, contextmask);
-		cb.SetSolution(Solution, ObjectiveValue);
+		//Solving takes place here too for scoping reasons
+		//if (T == 2) {
+		//	LocalBranching_TwoYearCallback cb(data, model, x, theta, theta_obj, trust);
+		//	CPXLONG contextmask = IloCplex::Callback::Context::Id::Candidate
+		//		| IloCplex::Callback::Context::Id::Relaxation
+		//		| IloCplex::Callback::Context::Id::Branching;
+		//	cplex.use(&cb, contextmask);
+		//	cb.SetSolution(Solution, ObjectiveValue);
+
+		//	//Solve and get results
+		//	bool solved = cplex.solve();
+		//	cplex.out() << endl;
+		//	if (verbose) {
+		//		cplex.out() << "Solution status: " << cplex.getCplexStatus() << endl;
+		//		cplex.out() << "Optimal value: " << cb.GetSolutionObjective() << endl;
+		//		cplex.out() << "\n" << endl;
+		//	}
+
+		//	for (pair<string, int> res : cb.stats) {
+		//		string category = res.first;
+		//		int value = res.second;
+		//		stats[category] = value;
+		//	}
+
+		//	stats["nNodes"] += (int)cplex.getNnodes();
+		//	stats["CplexStatus"] = (int)cplex.getStatus();
+		//	stats["Solve time, MIP (x100)"] = (int)100 * cplex.getTime();
+		//	stats["ObjectiveValue (x100)"] = (int)100 * cb.GetSolutionObjective();
+		//	stats["OptimalityGap (x100)"] = (int)10000 * cplex.getMIPRelativeGap();
+
+		//	if (cb.LazyCutTimes.size() > 0) {
+		//		stats["LazyCutTime (x1000)"] = 1000 * Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(cb.LazyCutTimes.data(), cb.LazyCutTimes.size()).mean();
+		//	}
+		//	if (cb.UserCutTimes.size() > 0) {
+		//		stats["UserCutTime (x1000)"] = 1000 * Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(cb.UserCutTimes.data(), cb.UserCutTimes.size()).mean();
+		//	}
+
+		//	Solution = cb.GetSolution();
+		//}
+		//else{
+			LocalBranching_Callback cb(data, model, x, theta, theta_obj, trust);
+			CPXLONG contextmask = IloCplex::Callback::Context::Id::Candidate
+				| IloCplex::Callback::Context::Id::Relaxation;
+			cplex.use(&cb, contextmask);
+			cb.SetSolution(Solution, ObjectiveValue);
+
+			//Solve and get results
+			bool solved = cplex.solve();
+			cplex.out() << endl;
+			if (verbose) {
+				cplex.out() << "Solution status: " << cplex.getCplexStatus() << endl;
+				cplex.out() << "Optimal value: " << cb.GetSolutionObjective() << endl;
+				cplex.out() << "\n" << endl;
+			}
+
+			for (pair<string, int> res : cb.stats) {
+				string category = res.first;
+				int value = res.second;
+				stats[category] = value;
+			}
+			stats["nNodes"] += (int)cplex.getNnodes();
+			stats["CplexStatus"] = (int)cplex.getStatus();
+			stats["Solve time, MIP (x100)"] = (int)100 * cplex.getTime();
+			stats["ObjectiveValue (x100)"] = (int)100 * cb.GetSolutionObjective();
+			stats["OptimalityGap (x100)"] = (int)10000 * cplex.getMIPRelativeGap();
+
+			if (cb.LazyCutTimes.size() > 0) {
+				stats["LazyCutTime (x1000)"] = 1000 * Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(cb.LazyCutTimes.data(), cb.LazyCutTimes.size()).mean();
+			}
+			if (cb.UserCutTimes.size() > 0) {
+				stats["UserCutTime (x1000)"] = 1000 * Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(cb.UserCutTimes.data(), cb.UserCutTimes.size()).mean();
+			}
+
+			Solution = cb.GetSolution();
+		//}
+
 
 
 		////////////////////////////////////////////////////////////////////////////////////////////
-		//Solve and get results
-		bool solved = cplex.solve();
-		cplex.out() << endl;
-		if (verbose) {
-			cplex.out() << "Solution status: " << cplex.getCplexStatus() << endl;
-			cplex.out() << "Optimal value: " << cb.GetSolutionObjective() << endl;
-			cplex.out() << "\n" << endl;
-		}
 
-		for (pair<string, int> res : cb.stats) {
-			string category = res.first;
-			int value = res.second;
-			stats[category] = value;
-		}
-		stats["nNodes"] += (int)cplex.getNnodes();
-		stats["CplexStatus"] = (int) cplex.getStatus();
-		stats["Solve time, MIP (x100)"] = (int)100 * cplex.getTime();
-		stats["ObjectiveValue (x100)"] = (int)100 * cb.GetSolutionObjective();
-		stats["OptimalityGap (x100)"] = (int)10000 * cplex.getMIPRelativeGap();
-
-		if (cb.LazyCutTimes.size() > 0) {
-			stats["LazyCutTime (x1000)"] = 1000 * Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(cb.LazyCutTimes.data(), cb.LazyCutTimes.size()).mean();
-		}
-		if (cb.UserCutTimes.size() > 0) {
-			stats["UserCutTime (x1000)"] = 1000 * Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(cb.UserCutTimes.data(), cb.UserCutTimes.size()).mean();
-		}
-
-		Solution = cb.GetSolution();
 		ConvertSolution();
 
 	}

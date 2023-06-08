@@ -8,6 +8,7 @@
 #include "Utils.h"
 #include "MultiCutBenders_Callback.h"
 #include "LocalBranching_Callback.h"
+#include "LocalBranching_TwoYearCallback.h"
 #include "Greedy.h"
 
 
