@@ -52,46 +52,16 @@ json ConvertMap(map<string, int> stats) {
     json final;
 
     vector<string> StatusConversion = { "Unknown", "Feasible", "Optimal", "Infeasible", "Unbounded", "InfeasibleOrUnbounded", "Error", "Bounded"};
-     
-    final["Solve time, MIP (sec)"] = (double)temp.value("Solve time, MIP (x100)", -1) / 100;
+    final["Cplex status"] = StatusConversion[temp.value("CplexStatus", 0)];
+    final["Solve time (sec)"] = (double)temp.value("SolveTime (x100)", -1) / 100;
     final["Objective value"] = (double)temp.value("ObjectiveValue (x100)", -1) / 100;
+    final["Optimality gap (%)"] = (double)temp.value("OptimalityGap (x100)", -1) / 100;
+    final["Number of nodes"] = temp.value("nNodes", -1);
+    final["Number of lazy cuts"] = temp.value("nLazyCuts", -1);
+    final["Average lazy cut time (sec)"] = (double)temp.value("LazyCutTime (x1000)", -1) / 1000;
+    final["Number of user cuts"] = temp.value("nUserCuts", -1);
+    final["Average user cut time (sec)"] = (double)temp.value("UserCutTime (x1000)", -1) / 1000;
 
-    if (temp.contains("Solve time, LP (x100)")) {
-        final["Solve time, LP (sec)"] = (double)temp.value("Solve time, LP (x100)", -1) / 100;
-    }
-    if (temp.contains("CplexStatus")) {
-        final["Cplex status"] = StatusConversion[temp.value("CplexStatus", 0)];
-    }
-    if (temp.contains("OptimalityGap (x100)")) {
-        final["Optimality gap (%)"] = (double)temp.value("OptimalityGap (x100)", -1) / 100;
-    }
-    if (temp.contains("nNodes")) {
-        final["Number of nodes"] = temp.value("nNodes", -1);
-    }
-    if (temp.contains("nLazyCuts")) {
-        final["Number of lazy cuts"] = temp.value("nLazyCuts", -1);
-    }
-    if (temp.contains("LazyCutTime (x1000)")) {
-        final["Average lazy cut time (sec)"] = (double)temp.value("LazyCutTime (x1000)", -1) / 1000;
-    }
-    if (temp.contains("nUserCuts")) {
-        final["Number of user cuts"] = temp.value("nUserCuts", -1);
-    }
-    if (temp.contains("UserCutTime (x1000)")) {
-        final["Average user cut time (sec)"] = (double)temp.value("UserCutTime (x1000)", -1) / 1000;
-    }
-    if (temp.contains("nRestricted")) {
-        final["Number of restricted subproblems"] = (int)temp.value("nRestricted", -1);
-    }
-    if (temp.contains("nDiversified")) {
-        final["Number of diversified subproblems"] = (int)temp.value("nDiversified", -1);
-    }
-    if (temp.contains("nManualBranches")) {
-        final["Number of local branching separations"] = (int)temp.value("nManualBranches", -1);
-    }
-    if (temp.contains("GRASP cut time (x100)")) {
-        final["GRASP cut time (sec)"] = (double)temp.value("GRASP cut time (x100)", -1) / 100;
-    }
     return final;
 }
 
@@ -126,8 +96,8 @@ int main(int argc, char** argv) {
     //map <string, map<string, vector<int>>> stats = Stats;
 
     json temp;
-    vector<string> doubles = { "Solve time (sec)" , "Objective value" , "Optimality gap (%)" , "Average lazy cut time (sec)" , "Average user cut time (sec)" };
-    vector<string> ints = { "Number of nodes" , "Number of lazy cuts" , "Number of user cuts" };
+    vector<string> doubles = { "Solve time, LP (sec)" , "Solve time, MIP (sec)", "Objective value" , "Optimality gap (%)" , "Average lazy cut time (sec)" , "Average user cut time (sec)" };
+    vector<string> ints = { "Number of nodes" , "Number of lazy cuts" , "Number of user cuts", "Number of restricted subproblems", "Number of diversified subproblems" };
     vector<string> strings = { "Cplex status" };
 
     for (string key : doubles) { temp[key] = vector<double>(); }
@@ -137,16 +107,11 @@ int main(int argc, char** argv) {
 
     time_t start;
     time(&start);
-    std::string basefile = "C:\\Users\\dobby\\Desktop\\Git Hub repo\\Charging-Station_Cpp\\";
-    string sharedFile = basefile + "Shared_Home.json";
-    string instanceFile = basefile + "MC0_Home_compressed.json";
+    string path = "C:\\Users\\dobby\\Desktop\\Git Hub repo\\Charging-Station_Cpp\\";
+    string shared = path + "Shared_Home.json";
+    string instance = path + "MC0_Home_compressed.json";
     Data data;
-    //data.load_fromUtilities(sharedFile, instanceFile, true, priceProfile::OnlyLevel3_Unperturbed);
-    data.load(sharedFile, instanceFile, true);
-    data.params["Stations_maxNewOutletsPerTimePeriod"] = 4;
-    data.params["Stations_maxNewStationsPerTimePeriod"] = 2;
-    //data.T = 2;
-
+    data.load(shared, instance, true);
     std::cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
     //std::cout << "Precovered: " << data.Precovered[0] + data.Precovered[1] + data.Precovered[2] + data.Precovered[3] << endl;
 
@@ -823,9 +788,38 @@ int main(int argc, char** argv) {
             //data.load_fromUtilities(sharedFile, instanceFile, true, priceProfile::OnlyLevel3_Unperturbed);
 
             cout << "Data loading time: " << time(NULL) - start << " seconds" << endl;
-            cout << endl;
-            
-                        
+
+            //{
+            //    string label = "B&C";
+            //    Model_BB mdl;
+            //    mdl.SetData(data);
+            //    cout << "Method: " << label << endl;
+            //    mdl.Solve();
+            //    Results_objs[label].push_back(mdl.ObjectiveValue);
+            //    Results_times[label].push_back(mdl.SolveTime);
+            //    Results_gaps[label].push_back(mdl.OptimalityGap);
+            //    Results_stats[label]["nNodes"].push_back(mdl.nNodes);
+            //}
+            {
+                string label = "Multi1PO1+Distance4";
+                if (!(Results_stats.contains(label))) { throw std::runtime_error("Label missing from JSON. Add label to labels vector."); }
+                if (Results_stats[label]["Cplex status"].size() > (long unsigned int) test) { throw std::runtime_error("Results already populated. Check the label is spelled correctly or disable this error."); }
+                json params = { { "verbose", true } };
+                Model_Improved mdl;
+                mdl.SetData(data);
+                cout << "Method: " << label << endl;
+                mdl.Solve(params);
+                json final = ConvertMap(mdl.stats);
+                for (auto& el : final.items())
+                {
+                    Results_stats[label][el.key()].push_back(el.value());
+                }
+                cout << endl;
+
+            }
+
+
+
             //{
             //    string label = "Greedy";
             //    cout << "Method: " << label << endl;
