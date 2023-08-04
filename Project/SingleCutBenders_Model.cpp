@@ -138,9 +138,6 @@ void SingleCutBenders_Model::Solve(json params)
 		cplex.use(&cb, contextmask);
 
 
-		////Warmstart
-		//IloNumVarArray startVar(env);
-		//IloNumArray startVal(env);
 
 
 		cout << "Model creation time: " << time(NULL) - start << " seconds" << endl;
