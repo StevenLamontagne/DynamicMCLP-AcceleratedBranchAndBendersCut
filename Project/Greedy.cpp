@@ -35,7 +35,6 @@ void Greedy::Solve(bool _verbose, BUDGET_TYPE budgetType)
 
 		//Initialise coverage of triplets and solution quality
 		cover.push_back(VectorXd::Constant(P[t], 0.0)); //By construction, all of the precovered triplets have been removed
-		//SolutionQuality += data.Precovered[t];
 		
 	}
 	if (verbose) {
@@ -61,7 +60,7 @@ void Greedy::Solve(bool _verbose, BUDGET_TYPE budgetType)
 			StationTotals.setConstant(0.0);
 			Costs.setConstant(0.0);
 			VectorXd uncovered = (cover[t].array() < 1).matrix().cast<double>();
-			//cout << uncovered.sum() << endl;;
+
 			
 			int StationsOpened = 0;
 			int OutletsInstalled = 0;
@@ -83,7 +82,6 @@ void Greedy::Solve(bool _verbose, BUDGET_TYPE budgetType)
 				int updated = Solution[t][j] + 1;
 				//Skip: Maximum number of outlets already placed
 				if (updated >= Mj[j]) {
-					//if (verbose) { cout << "Skipping station " << j << " due to maximum outlets." << endl; }
 					continue;
 				}
 				double cost = data.params["c"][t][j][updated];
@@ -108,12 +106,9 @@ void Greedy::Solve(bool _verbose, BUDGET_TYPE budgetType)
 				int j_bar = coordConverter[make_pair(j, updated)];
 				StationTotals(j) = data.CutCoeffs[t].col(j_bar).dot(uncovered);
 				StationTotals(j) += data.Ps[t](j_bar);
-				if (budgetType == BUDGET_TYPE::Knapsack) { StationTotals(j) /= cost; }  //Should we care about the cost in the number of outlets case? 			
+				if (budgetType == BUDGET_TYPE::Knapsack) { StationTotals(j) /= cost; } 		
 			}
 
-			//cout << "Station totals: [";
-			//for (double val : StationTotals) { cout << val << ", "; }
-			//cout << "]" << endl;
 
 			int j_star;
 			double z_star = StationTotals.maxCoeff(&j_star);

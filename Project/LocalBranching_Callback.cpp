@@ -245,37 +245,24 @@ void LocalBranching_Callback::AddBendersCuts(const IloCplex::Callback::Context& 
 	IloEnv env = context.getEnv();
 	vector<VectorXd> I_tilde = CalculateItilde(x_tilde);
 
-	////Multi-cut (by year), B1
-	//for (int t = 0; t < T; t++) {
-	//	IloExpr lhs(env);
-	//	lhs -= theta[t];
-	//	double covered = (I_tilde[t].array() >= 1).matrix().cast<double>().dot(data.weights[t]);
-	//	VectorXd uncovered = (I_tilde[t].array() < 1).matrix().cast<double>();
-	//	for (int j_bar = 0; j_bar < M_bar; j_bar++) {
-	//		lhs += (data.CutCoeffs[t].col(j_bar).dot(uncovered)) * x[t][j_bar];
-	//	}
 
-	//	switch (context.getId()) {
-	//	case (IloCplex::Callback::Context::Id::Candidate):
-	//		if (context.getCandidateValue(lhs) < -covered -EPS) {
-	//			context.rejectCandidate(lhs >= -covered);
-	//		}
-	//		lhs.end();
-	//		break;
-	//	case (IloCplex::Callback::Context::Id::Relaxation):
-	//		if (context.getRelaxationValue(lhs) < -covered -EPS) {
-	//			//context.addUserCut(lhs >= 0, IloCplex::UseCutForce, IloFalse).end();
-	//			context.addUserCut(lhs >= -covered, IloCplex::UseCutPurge, IloFalse);
-	//		}
-	//		lhs.end();
-	//		break;
-	//	}
-	//}
-
-
-
-	//Multi-cut (by year), Multi1PO1
 	for (int t = 0; t < T; t++) {
+
+		//To use non-Pareto-optimal cuts, uncomment the first block and comment out the second block
+		/////////////////////////////////////////////////////////////////////////
+
+		////Multi-cut (by year), B1
+		//	IloExpr lhs(env);
+		//	lhs -= theta[t];
+		//	double covered = (I_tilde[t].array() >= 1).matrix().cast<double>().dot(data.weights[t]);
+		//	VectorXd uncovered = (I_tilde[t].array() < 1).matrix().cast<double>();
+		//	for (int j_bar = 0; j_bar < M_bar; j_bar++) {
+		//		lhs += (data.CutCoeffs[t].col(j_bar).dot(uncovered)) * x[t][j_bar];
+		//	}
+
+		//////////////////////////////////////////////////////////////////////////////
+
+		//Multi-cut (by year), Pareto-optimal B1
 		IloExpr lhs(env);
 		lhs -= theta[t];
 		double covered = ((I_tilde[t].array() > 1) || ((I_tilde[t].array() == 1) && (core_coverage[t].array() >= 1))).matrix().cast<double>().dot(data.weights[t]);
@@ -284,6 +271,8 @@ void LocalBranching_Callback::AddBendersCuts(const IloCplex::Callback::Context& 
 		for (int j_bar = 0; j_bar < M_bar; j_bar++) {
 			lhs += (data.CutCoeffs[t].col(j_bar).dot(uncovered)) * x[t][j_bar];
 		}
+
+		//////////////////////////////////////////////////////////////////////////////
 
 		switch (context.getId()) {
 		case (IloCplex::Callback::Context::Id::Candidate):
@@ -297,7 +286,6 @@ void LocalBranching_Callback::AddBendersCuts(const IloCplex::Callback::Context& 
 		case (IloCplex::Callback::Context::Id::Relaxation):
 		{
 			if (context.getRelaxationValue(lhs) < -covered - EPS) {
-				//context.addUserCut(lhs >= -covered, IloCplex::UseCutForce, IloFalse);
 				context.addUserCut(lhs >= -covered, IloCplex::UseCutPurge, IloFalse);
 			}
 			lhs.end();
@@ -560,6 +548,17 @@ IloAlgorithm::Status LocalBranching_Callback::SubproblemRestricted(IloEnv& env, 
 
 	AddTrustCutsInner(env, submodel, x_tilde, 2.0);
 
+
+	//To use the SubB method, uncomment the first block and comment out the second block
+	///////////////////////////////////////////////////////////////////////////////////////////
+
+	//MultiCutBenders_Callback cb(data, x, theta);
+	//CPXLONG contextmask = IloCplex::Callback::Context::Id::Candidate
+	//	| IloCplex::Callback::Context::Id::Relaxation;
+	//subcplex.use(&cb, contextmask);
+
+	///////////////////////////////////////////////////////////////////////////////////////////
+
 	//Two-opt cut generation
 	for (int t = 0; t < T; t++) {
 		vector<int> always;
@@ -628,6 +627,10 @@ IloAlgorithm::Status LocalBranching_Callback::SubproblemRestricted(IloEnv& env, 
 			submodel.add(lhs >= -covered);
 		}
 	}
+
+	/////////////////////////////////////////////////////////////////////////////////////
+	//End of block for SubB method
+
 	bool solved = subcplex.solve();
 	if (solved) {
 		obj = subcplex.getObjValue();

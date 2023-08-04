@@ -9,6 +9,15 @@
 #include "MultiCutBenders_Callback.h"
 #include "Greedy.h"
 
+/*
+Class for storing and solving the dynamic MCLP (EV charging station placement problem) using the
+A-B&BC method.
+Solution value and objective value have dedicated attributes, whereas all other solve statistics (including
+the solve time) are stored in the 'stats' attribute.
+
+'budgetType' is an option for using either knapsack-style or cardinality-style budget constraints. This was not
+in the final paper, but was left in case it could be useful reference.
+*/
 class MultiCutBenders_Model
 {
 public:
@@ -25,10 +34,6 @@ public:
 	bool verbose = false;
 	BUDGET_TYPE budgetType = BUDGET_TYPE::Knapsack;
 	
-
-
-
-
 
 private:
 	Data data;

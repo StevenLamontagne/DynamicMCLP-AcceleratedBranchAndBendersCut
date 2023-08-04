@@ -34,9 +34,10 @@ void Data::load(string sharedFile, string instanceFile, bool verbose)
         cout << e.what() << '\n';
     }
 
-    params["Stations_isLevel3"] = isLevel3;
-    params["Stations_costMultiplier"] = costMultiplier;
 
+    //These parameters are not found nor used in the original paper, but can be used for
+    //cardinality-style budget constraints 
+    params["Stations_isLevel3"] = isLevel3;
     params["Stations_maxNewOutletsPerTimePeriod"] = 4;
     params["Stations_maxNewStationsPerTimePeriod"] = 2;
 
@@ -46,7 +47,7 @@ void Data::load(string sharedFile, string instanceFile, bool verbose)
 
 }
 
-void Data::load_fromUtilities(string sharedFile, string instanceFile, bool verbose, priceProfile priceProfile)
+void Data::load_fromUtilities(string sharedFile, string instanceFile, bool verbose)
 {
     if (verbose) {
         cout << "File loading starting \n";
@@ -71,16 +72,16 @@ void Data::load_fromUtilities(string sharedFile, string instanceFile, bool verbo
         cout << "Loading coverage file \n";
     }
 
+    //These parameters are not found nor used in the original paper, but can be used for
+    //cardinality-style budget constraints 
     params["Stations_isLevel3"] = isLevel3;
-    params["Stations_costMultiplier"] = costMultiplier;
-
+    params["Stations_maxNewOutletsPerTimePeriod"] = 4;
+    params["Stations_maxNewStationsPerTimePeriod"] = 2;
 
     int maxOutlets = 0;
     for (int j = 0; j < params["M"]; j++) {
         maxOutlets += (int) params["Mj"][j] - 1;
     }
-    params["Stations_maxNewOutletsPerTimePeriod"] = 4;
-    params["Stations_maxNewStationsPerTimePeriod"] = 2;
 
 
     json instance;
@@ -89,7 +90,6 @@ void Data::load_fromUtilities(string sharedFile, string instanceFile, bool verbo
     f2.close();
 
 
-    
     vector<vector<vector<double>>> c;
     for (int t = 0; t < T; t++) {
         vector<vector<double>> c1;
@@ -98,64 +98,19 @@ void Data::load_fromUtilities(string sharedFile, string instanceFile, bool verbo
             c2.push_back(0.0);
             
             for (int k = 1; k < params["Mj"][j]; k++) {
-
                 //Use different price profiles for level 2 versus level 3
-                switch (priceProfile)
-                {
-                case priceProfile::MixedLevel2andLevel3_Unperturbed:
-                {
-                    if (isLevel3[j]) {
-                        double val = 0.0;
-                        if (k % 4 == 1) { val = (double)instance["c"][t][j] + (double)instance["f"][t][j]; }
-                        else { val = (double)instance["c"][t][j]; }
-                        c2.push_back(val);
-                    }
-                    else {
-                        double val = 0.0;
-                        if (k == 1) { val = 0.1 * (double)instance["c"][t][j] + 0.25 * (double)instance["f"][t][j]; }
-                        else { val = 0.1 * (double)instance["c"][t][j]; }
-                        c2.push_back(val);
-                    }
-                    break;
-                }
-                case priceProfile::MixedLevel2andLevel3_Perturbed:
-                {
-                    if (isLevel3[j]) {
-                        double val = 0.0;
-                        if (k % 4 == 1) { val = (double)instance["c"][t][j] + (double)instance["f"][t][j]; }
-                        else { val = (double)instance["c"][t][j]; }
-                        val *= costMultiplier[j]; 
-                        c2.push_back(val);
-                    }
-                    else {
-                        double val = 0.0;
-                        if (k == 1) { val = 0.1 * (double)instance["c"][t][j] + 0.25 * (double)instance["f"][t][j]; }
-                        else { val = 0.1 * (double)instance["c"][t][j]; }
-                        val *= costMultiplier[j]; 
-                        c2.push_back(val);
-                    }
-                    break;
-                }
-                case priceProfile::OnlyLevel3_Perturbed:
-                {
+                if (isLevel3[j]) {
                     double val = 0.0;
-                    if (k == 1) { val = (double)instance["c"][t][j] + (double)instance["f"][t][j]; }
-                    else { val = (double)instance["c"][t][j]; }
-                    val *= costMultiplier[j];
-                    c2.push_back(val);
-                    break;
-                }
-                case priceProfile::OnlyLevel3_Unperturbed:
-                default:
-                {
-                    double val = 0.0;
-                    if (k == 1) { val = (double)instance["c"][t][j] + (double)instance["f"][t][j]; }
+                    if (k % 4 == 1) { val = (double)instance["c"][t][j] + (double)instance["f"][t][j]; }
                     else { val = (double)instance["c"][t][j]; }
                     c2.push_back(val);
-                    break;
                 }
+                else {
+                    double val = 0.0;
+                    if (k == 1) { val = 0.1 * (double)instance["c"][t][j] + 0.25 * (double)instance["f"][t][j]; }
+                    else { val = 0.1 * (double)instance["c"][t][j]; }
+                    c2.push_back(val);
                 }
-
             }
             c1.push_back(c2);
         }
@@ -203,8 +158,8 @@ void Data::load_fromUtilities(string sharedFile, string instanceFile, bool verbo
                 if ((k > 1) && (temp_a(p, j_bar - 1))) {continue;}
                 if (instance["d1"][t][j][i][r] != nullptr) {
                     double d1 = instance["d1"][t][j][i][r]; 
-                    if (((priceProfile == priceProfile::MixedLevel2andLevel3_Perturbed) || (priceProfile == priceProfile::MixedLevel2andLevel3_Unperturbed)) && (!isLevel3[j]))
-                    { d1 -= 1.463601; } //Reduce the value here if the station is level 2 instead of level 3 (by 1.463601, the value calculated by Mahsa)
+                    if (!isLevel3[j])
+                    { d1 -= 1.463601; } //Reduce the value here if the station is level 2 instead of level 3 (by 1.463601, the value calculated in prior work)
                     if (instance["beta"][t][j][i][k] == nullptr) { continue; }
                     double beta = instance["beta"][t][j][i][k];
                     double u = beta + d1;
@@ -346,6 +301,9 @@ void Data::create_covering(string instanceFile, bool verbose)
         Eigen::Array<bool, Eigen::Dynamic, 1> temp_home = Eigen::Array<bool, Eigen::Dynamic, 1>::Constant(P_est, 0);
         Eigen::Array<bool, Eigen::Dynamic, Eigen::Dynamic> temp_a = Eigen::Array<bool, Eigen::Dynamic, Eigen::Dynamic>::Constant(P_est, M_bar, 0);
 
+
+        //A bit clunky, but we use temporary objects here as we do not know the final size our Arrays should be,
+        //and adding elements to our sparse array is messy
         vector<double> temp_weight;
         std::vector<Tripletd> tripletList_a;
         std::vector<Tripletd> tripletList_CutCoeffs;
@@ -367,15 +325,15 @@ void Data::create_covering(string instanceFile, bool verbose)
             int r = params["user_coord"][coord][1];
             double weight = (double)params["Ni"][t][i] / (double)params["R"][i];
 
-            if (temp_home(coord) == 1) { Precovered[t] += weight; continue; }
+            if (temp_home(coord) == 1) { Precovered[t] += weight; continue; } //Triplet (t,i,r) is precovered
 
             Eigen::Array<bool, 1, Eigen::Dynamic> sub = temp_a.row(coord);
             int n = sub.count();
             switch (n)
             {
-            case 0:
+            case 0: //Triplet (t,i,r) is uncoverable 
                 break;
-            case 1:
+            case 1: //Triplet (t,i,r) is in Ps
             {
                 int j_bar;
                 sub.maxCoeff(&j_bar);
@@ -385,7 +343,7 @@ void Data::create_covering(string instanceFile, bool verbose)
                 else { Ps[t](j_bar) += weight; }
                 break;
             }
-            default:
+            default: //Triplet (t,i,r) is in P/Ps
             {
                 bool pre = false;
                 int reindex = temp_weight.size();

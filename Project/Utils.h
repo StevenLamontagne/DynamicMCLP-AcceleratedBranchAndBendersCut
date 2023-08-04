@@ -1,3 +1,6 @@
+//NOTE: This file is mostly used for common functions and definitions, though most of the 
+//enums here are deprecated
+
 #pragma once
 #include <ilcplex/ilocplex.h>
 #include <cmath>

@@ -1,6 +1,7 @@
 #include "SingleCutBenders_Callback.h"
 
 
+
 void SingleCutBenders_Callback::invoke(const IloCplex::Callback::Context& context)
 {
 	chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
@@ -8,13 +9,19 @@ void SingleCutBenders_Callback::invoke(const IloCplex::Callback::Context& contex
 	switch (context.getId()) {
 	case (IloCplex::Callback::Context::Id::Candidate): 
 	{
+		//CPLEX can occasionally not behave with these cuts, and 
+		//will repeatedly loop at the same solution adding cuts over
+		//and over again. This block detects that case and kicks CPLEX out
+		///////////////////////////////////////////////////////////////////
 		double obj_new = context.getCandidateObjective();
 		if (obj_new == obj_val) { duplicate_counter += 1; }
 		else { obj_val = obj_new; duplicate_counter = 0; }
 		if (duplicate_counter >= 5){ 
 			cout << "Looping detected at integer node." << endl;
 			context.rejectCandidate();
-			break; }
+			break; 
+		}
+		///////////////////////////////////////////////////////////////////
 
 		LazyCutCallback(context);
 		double time = chrono::duration_cast<chrono::duration<double>>(chrono::steady_clock::now() - t1).count();
@@ -23,6 +30,10 @@ void SingleCutBenders_Callback::invoke(const IloCplex::Callback::Context& contex
 	}
 	case (IloCplex::Callback::Context::Id::Relaxation):
 	{
+		//CPLEX can occasionally not behave with these cuts, and 
+		//will repeatedly loop at the same solution adding cuts over
+		//and over again. This block detects that case and kicks CPLEX out
+		///////////////////////////////////////////////////////////////////
 		double obj_new = context.getRelaxationObjective();
 		if (obj_new == obj_val) { duplicate_counter += 1; }
 		else { obj_val = obj_new; duplicate_counter = 0; }
@@ -31,6 +42,7 @@ void SingleCutBenders_Callback::invoke(const IloCplex::Callback::Context& contex
 			context.exitCutLoop(); 
 			break; 
 		}
+		/////////////////////////////////////////////////////////////////
 
 
 		UserCutCallback(context);
@@ -103,44 +115,31 @@ void SingleCutBenders_Callback::AddCuts(const IloCplex::Callback::Context& conte
 	lhs -= theta;
 	IloNum covered = 0;
 
-	switch (cut_type)
-	{
+	//To use B2-type cuts instead of B1-type cuts, comment out the first block and uncomment the second block
+	//////////////////////////////////////////////////////////////////////////////////////////////////
 
-	//////////////////////////////////////////////////////////////////////////////////////////
-	//Single B1 cut
-	case SINGLE_CUTS::SingleB1:
-	{
-		for (int t = 0; t < data.T; t++) {
-			covered += (I_tilde[t].array() >= 1).matrix().cast<double>().dot(data.weights[t]);
-			VectorXd uncovered = (I_tilde[t].array() < 1).cast<double>();
-			for (int j_bar = 0; j_bar < data.M_bar; j_bar++) {
-				lhs += (data.CutCoeffs[t].col(j_bar).dot(uncovered) + data.Ps[t](j_bar)) * x[t][j_bar];
-			}
+	//Single-cut, B1
+	for (int t = 0; t < data.T; t++) {
+		covered += (I_tilde[t].array() >= 1).matrix().cast<double>().dot(data.weights[t]);
+		VectorXd uncovered = (I_tilde[t].array() < 1).cast<double>();
+		for (int j_bar = 0; j_bar < data.M_bar; j_bar++) {
+			lhs += (data.CutCoeffs[t].col(j_bar).dot(uncovered) + data.Ps[t](j_bar)) * x[t][j_bar];
 		}
-		break;
 	}
 
-	//////////////////////////////////////////////////////////////////////////////////////////
-	//Single B2 cut
-	case SINGLE_CUTS::SingleB2:
-	{
-		for (int t = 0; t < data.T; t++) {
-			covered += (I_tilde[t].array() > 1).matrix().cast<double>().dot(data.weights[t]);
-			VectorXd uncovered = (I_tilde[t].array() <= 1).cast<double>();
-			for (int j_bar = 0; j_bar < data.M_bar; j_bar++) {
-				lhs += (data.CutCoeffs[t].col(j_bar).dot(uncovered) + data.Ps[t](j_bar)) * x[t][j_bar];
-			}
-		}
-		break;
-	}
-	//////////////////////////////////////////////////////////////////////////////////////////
-	//Will probably throw an error earlier, but just in case
-	default:
-		cout << "Unrecognised cut type" << endl;
-		throw;
-		break;
-	}
+	//////////////////////////////////////////////////////////////////////////////////////////////////
 
+	////Single-cut, B2
+	//for (int t = 0; t < data.T; t++) {
+	//	covered += (I_tilde[t].array() > 1).matrix().cast<double>().dot(data.weights[t]);
+	//	VectorXd uncovered = (I_tilde[t].array() <= 1).cast<double>();
+	//	for (int j_bar = 0; j_bar < data.M_bar; j_bar++) {
+	//		lhs += (data.CutCoeffs[t].col(j_bar).dot(uncovered) + data.Ps[t](j_bar)) * x[t][j_bar];
+	//	}
+	//}
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////
+	//End of blocks for cut type
 
 
 	switch (context.getId()) {
@@ -155,7 +154,6 @@ void SingleCutBenders_Callback::AddCuts(const IloCplex::Callback::Context& conte
 	case (IloCplex::Callback::Context::Id::Relaxation):
 	{
 		if (context.getRelaxationValue(lhs) < -covered - EPS) {
-			//context.addUserCut(lhs >= -covered, IloCplex::UseCutForce, IloFalse);
 			context.addUserCut(lhs >= -covered, IloCplex::UseCutPurge, IloFalse);
 		}
 		lhs.end();

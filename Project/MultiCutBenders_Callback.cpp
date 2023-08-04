@@ -12,12 +12,16 @@ void MultiCutBenders_Callback::invoke(const IloCplex::Callback::Context& context
 		switch (context.getId()) {
 		case (IloCplex::Callback::Context::Id::Candidate):
 		{
+			//CPLEX can occasionally not behave with these cuts, and 
+			//will repeatedly loop at the same solution adding cuts over
+			//and over again. This block detects that case and kicks CPLEX out
+			///////////////////////////////////////////////////////////////////
 			double obj_new = context.getCandidateObjective();
 			if (obj_new == obj_val) { duplicate_counter += 1; }
 			else { obj_val = obj_new; duplicate_counter = 0;}
 			if (duplicate_counter >= 5) { cout << "Looping detected at integer node." << endl; 
-			//context.rejectCandidate(); 
 			break;}
+			//////////////////////////////////////////////////////////////
 
 			//Get current solution value, x_tilde
 			for (int t = 0; t < T; t++) {
@@ -33,14 +37,19 @@ void MultiCutBenders_Callback::invoke(const IloCplex::Callback::Context& context
 		}
 		case (IloCplex::Callback::Context::Id::Relaxation):
 		{
-			
+			//Detect if we are at root node and, if so, do not add any cuts
 			if (context.getIntInfo(IloCplex::Callback::Context::Info::NodeUID) != 0) { break; }
+
+			//CPLEX can occasionally not behave with these cuts, and 
+			//will repeatedly loop at the same solution adding cuts over
+			//and over again. This block detects that case and kicks CPLEX out
+			///////////////////////////////////////////////////////////////////
 			double obj_new = context.getRelaxationObjective();
 			if (obj_new == obj_val) { duplicate_counter += 1; }
 			else { obj_val = obj_new; duplicate_counter = 0; }
 			if (duplicate_counter >= 5){ cout << "Looping detected at fractional node." << endl; 
-			//context.exitCutLoop(); 
 			break; }
+			//////////////////////////////////////////////////////////////////
 
 			//Get current solution value, x_tilde
 			for (int t = 0; t < T; t++) {
@@ -118,20 +127,29 @@ void MultiCutBenders_Callback::AddCuts(const IloCplex::Callback::Context& contex
 		IloExpr lhs(env);
 		lhs -= theta[t];
 
-		//Multi-cut (by time period), B1
+
+		//To use non-Pareto-optimal B1-type cuts, uncomment the first block and comment out
+		//the second block
+		////////////////////////////////////////////////////////////////////////
+
+		////Multi-cut (by time period), B1
 		//double covered = (I_tilde[t].array() >= 1).matrix().cast<double>().dot(data.weights[t]);
 		//VectorXd uncovered = (I_tilde[t].array() < 1).matrix().cast<double>();
 		//for (int j_bar = 0; j_bar < M_bar; j_bar++) {
 		//	lhs += (data.CutCoeffs[t].col(j_bar).dot(uncovered)) * x[t][j_bar];
 		//}
 
+		////////////////////////////////////////////////////////////////////////
 
-		//Multi-cut (by time period), B1 + pareto-optimal
+		//Multi-cut (by time period), B1 + Pareto-optimal
 		double covered = ((I_tilde[t].array() > 1) || ((I_tilde[t].array() == 1) && (core_coverage[t].array() >= 1))).matrix().cast<double>().dot(data.weights[t]);
 		VectorXd uncovered = ((I_tilde[t].array() < 1) || ((I_tilde[t].array() == 1) && (core_coverage[t].array() < 1))).cast<double>();
 		for (int j_bar = 0; j_bar < M_bar; j_bar++) {
 			lhs += (data.CutCoeffs[t].col(j_bar).dot(uncovered)) * x[t][j_bar];
 		}
+
+		////////////////////////////////////////////////////////////////////////
+		//End of blocks for cut type
 
 
 		switch (context.getId()) {

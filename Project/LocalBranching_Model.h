@@ -13,9 +13,15 @@
 
 
 
+/*
+Class for storing and solving the dynamic MCLP (EV charging station placement problem) using the
+A-B&BC+LB methods.
+Solution value and objective value have dedicated attributes, whereas all other solve statistics (including
+the solve time) are stored in the 'stats' attribute.
 
-
-
+'budgetType' is an option for using either knapsack-style or cardinality-style budget constraints. This was not
+in the final paper, but was left in case it could be useful reference.
+*/
 class LocalBranching_Model
 {
 public:
@@ -32,7 +38,10 @@ public:
 
 	//Options
 	bool verbose = false;
-	int nTrust = 1024;
+	//The array of binary variables for the disjuctive separation method must be preallocated
+	//This parameter determines the maximum number of separations that can be performed. 
+	//Any in excess of this value will use no-good cuts instead
+	int nTrust = 1024; 
 	BUDGET_TYPE budgetType = BUDGET_TYPE::Knapsack;
 
 	
@@ -40,12 +49,6 @@ public:
 	BoolVar2D x;
 	IloNumVarArray theta;
 
-	template<typename Iter, typename RandomGenerator>
-	Iter choice(Iter start, Iter end, RandomGenerator& g) {
-		std::uniform_int_distribution<> dis(0, std::distance(start, end) - 1);
-		std::advance(start, dis(g));
-		return start;
-	}
 
 private:
 	Data data;

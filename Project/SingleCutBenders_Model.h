@@ -7,6 +7,13 @@
 #include "Utils.h"
 #include "SingleCutBenders_Callback.h"
 
+
+/*
+Class for storing and solving the dynamic MCLP (EV charging station placement problem) using the 
+U-B&BC method.
+Solution value and objective value have dedicated attributes, whereas all other solve statistics (including
+the solve time) are stored in the 'stats' attribute.
+*/
 class SingleCutBenders_Model
 {
 public:
@@ -15,7 +22,6 @@ public:
 
 	//Options
 	bool verbose = false;
-	SINGLE_CUTS cut_type = SINGLE_CUTS::SingleB1;
 
 
 	//Storing information about solution

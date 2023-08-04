@@ -26,13 +26,6 @@ typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXXd;
 typedef Eigen::Triplet<double> Tripletd;
 typedef Eigen::Triplet<bool> Tripletb;
 
-enum class priceProfile
-{
-	MixedLevel2andLevel3_Unperturbed,
-	MixedLevel2andLevel3_Perturbed,
-	OnlyLevel3_Unperturbed,
-	OnlyLevel3_Perturbed
-};
 
 class Data
 {
@@ -47,25 +40,58 @@ public:
 	//Parameters from the Shared.json file
 	json params;
 
+	//In the data, all stations are assumed to be level 3, but this parameter can be adjusted if desired
+	//(only usable when loading from from utilities) 
 	vector<bool> isLevel3 = { 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 1, 0, 0 };
-	vector<float> costMultiplier = { 0.7707, 0.9917, 1.1381, 0.803, 1.1038, 0.9992, 1.1902, 1.1833, 1.2401, 1.1188, 0.8373,
-									 1.0819, 1.0997, 0.8856, 1.0984, 0.8053, 0.8103, 1.172, 0.7956, 1.1326, 1.1701, 1.1638,
-									 0.7603, 0.8443, 0.9484, 1.0118, 0.9439, 0.9442, 0.9484, 0.8184 };
 
-
+	//Precomputed coverage of each station-outlet pair, for each t
 	vector<SparseXXd> a;
+
+	//Precomputed values for a_{ij}^t * d_{ij}^t, for each t
 	vector<SparseXXd> CutCoeffs;
+
+	//Total demand covered *only* by each station-outlet pair, for each t
+	//Called "Js" in the paper
 	vector<Eigen::VectorXd> Ps;
+
+	//Total demand that is covered by home charging, for each t
 	vector<double> Precovered;
+
+	//Vector of weights d_{ij}^t, for each t
 	vector<Eigen::VectorXd> weights;
 
+	/*
+	Load parameters from 'sharedFile' and coverage for 'instanceFile'. 
+	This method is more efficient than load_fromUtilities as the coverage is already computed
+	and must simply be loaded in. In general, this method should be used if you are not 
+	changing the data.
+	*/
 	void load(string sharedFile, string instanceFile, bool verbose);
-	void load_fromUtilities(string sharedFile, string instanceFile, bool verbose = false, priceProfile priceProfile = priceProfile::MixedLevel2andLevel3_Perturbed);
+
+	/*
+	Load parameters from 'sharedFile' and compute coverage for 'instanceFile'.
+	This method requires calculating the utilities and resulting coverage values, 
+	and so should only be used if you need to change the underlying utilities
+	(e.g. if using level 2 and level 3 chargers and adjusting costs/utilities)
+	*/
+	void load_fromUtilities(string sharedFile, string instanceFile, bool verbose = false);
 	
+	/*
+	Deprecated function for calculating the total demand covered by a solution. Solutions
+	are represented as Arrays instead of as vectors. 
+	*/
 	double SolutionQuality(vector<vector<int>> Sol);
+
+	/*
+	Function for calculating the total demand covered by a solution.
+	*/
 	double SolutionQuality(ArrayXXd Sol);
 
 private:
+	/*
+	Loads the coverage for an instance file. Only used as part of load function, and
+	helps clean up the code a bit.
+	*/
 	void create_covering(string instanceFile, bool verbose);
 
 

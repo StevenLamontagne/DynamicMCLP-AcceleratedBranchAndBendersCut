@@ -12,6 +12,10 @@
 
 
 
+/*
+Class that handles the Benders cut generation as CPLEX callbacks. This method
+uses Pareto-optimal cuts and multi-cut generation.
+*/
 class MultiCutBenders_Callback : public IloCplex::Callback::Function
 {
 private:
@@ -24,11 +28,16 @@ private:
 	BoolVar2D x;
 	IloNumVarArray theta;
 	double incumbent = 0.0;
-	ArrayXXd core_point;
-	vector<VectorXd> core_coverage;
+
+	//Used for looping detection
 	double obj_val = -1.0;
 	short int duplicate_counter = 0;
-	double dual_val = 1.7e307;
+
+	//Core point information, for generating Pareto-optimal cuts
+	ArrayXXd core_point;
+	vector<VectorXd> core_coverage;
+
+
 
 	//Define constants for easier reading and writing
 	int& T = data.T;
@@ -39,9 +48,22 @@ private:
 	vector<int> Mj;
 
 
-	//Functions for adding cuts
+	/*
+	Function to run when the candidate solution is integer feasible.
+	Calculates the I_tilde for this context.
+	*/
 	void LazyCutCallback(const IloCplex::Callback::Context& context, const ArrayXXd& x_tilde);
+
+	/*
+	Function to run when the candidate solution is fractional.
+	Calculates the I_tilde for this context.
+	*/
 	void UserCutCallback(const IloCplex::Callback::Context& context, const ArrayXXd& x_tilde);
+
+	/*
+	Adds the Benders optimality cuts based on I_tilde. By default, this adds Pareto-optimal 
+	B1-type cuts, but this behaviour can be changed in the code.
+	*/
 	void AddCuts(const IloCplex::Callback::Context& context, const ArrayXXd& x_tilde, const vector<VectorXd>& I_tilde);
 
 
@@ -57,12 +79,20 @@ public:
 	
 	};
 
+	/*
+	Determines the context in which the callback has been activated (integer feasible or fractional solution), and invokes the
+	appropriate class functions. Also detects and fixes looping when it happens
+	*/
 	virtual void invoke(const IloCplex::Callback::Context& context);
 
-	map<string, int> stats = {};
-
+	/*
+	Updates the core point and the coverage of the core point. This is only necessary if using Pareto-optimal cuts
+	*/
 	void UpdateCorePoint(ArrayXXd x_new);
 
+	//Attributes for storing solve statistics. Since this class is initialised and 
+	//deconstructed within the model class, they are not accessible generally. 
+	map<string, int> stats = {};
 	vector<double> LazyCutTimes;
 	vector<double> UserCutTimes;
 };

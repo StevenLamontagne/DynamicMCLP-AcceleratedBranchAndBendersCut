@@ -4,7 +4,6 @@ void SingleCutBenders_Model::Solve(json params)
 {
 	//Set model parameters
 	verbose = params.value("verbose", false);
-	cut_type = params.value("cut_type", SINGLE_CUTS::SingleB1);
 
 	//Define constants for easier reading and writing
 	int& T = data.T;
@@ -132,7 +131,7 @@ void SingleCutBenders_Model::Solve(json params)
 
 
 		//Link callback
-		SingleCutBenders_Callback cb(data, x, theta, cut_type);
+		SingleCutBenders_Callback cb(data, x, theta);
 		CPXLONG contextmask = IloCplex::Callback::Context::Id::Candidate
 			| IloCplex::Callback::Context::Id::Relaxation;
 		cplex.use(&cb, contextmask);

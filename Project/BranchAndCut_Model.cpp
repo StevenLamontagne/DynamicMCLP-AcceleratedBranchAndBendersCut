@@ -6,7 +6,7 @@ void BranchAndCut_Model::Solve(json params)
 
 	//Set model parameters
 	verbose = params.value("verbose", false);
-	BUDGET_TYPE budgetType = params.value("budgetType", BUDGET_TYPE::Knapsack);
+	budgetType = params.value("budgetType", BUDGET_TYPE::Knapsack);
 
 	//Define constants for easier reading and writing
 	int& T = data.T;
@@ -64,29 +64,6 @@ void BranchAndCut_Model::Solve(json params)
 
 
 	//Constraints
-	//////Budget, year 0
-	//IloExpr budget0(env);
-	//for (int j_bar = 0; j_bar < M_bar; j_bar++) {
-	//	int j = data.params["station_coord"][j_bar][0];
-	//	int k = data.params["station_coord"][j_bar][1];
-	//	budget0 += (double)data.params["c"][0][j][k] * (x[0][j_bar] - (int)data.params["x0"][j][k]);
-	//}
-	//model.add(budget0 <= (double)data.params["B"][0]);
-	//budget0.end();
-
-	//////Budget, year 1+
-	//for (int t = 1; t < T; t++) {
-	//	IloExpr budget(env);
-	//	for (int j_bar = 0; j_bar < M_bar; j_bar++) {
-	//		int j = data.params["station_coord"][j_bar][0];
-	//		int k = data.params["station_coord"][j_bar][1];
-	//		budget += (double)data.params["c"][t][j][k] * (x[t][j_bar] - x[t - 1][j_bar]);
-	//	}
-	//	model.add(budget <= (double)data.params["B"][t]);
-	//	budget.end();
-	//}
-
-		//Constraints
 	switch (budgetType)
 	{
 	case BUDGET_TYPE::Knapsack:
@@ -190,7 +167,7 @@ void BranchAndCut_Model::Solve(json params)
 
 	////Covering 
 	for (int t = 0; t < T; t++) {
-		//The data class is optimised for Bender's methods, and so we must rebuild the original coverage matrix for use here
+		//The data class is optimised for Benders methods, and so we must rebuild the original coverage matrix for use here
 		IloArray<IloNumArray> coverage(env, P[t]);
 		for (int p = 0; p < P[t]; p++) {
 			coverage[p] = IloNumArray(env, M_bar);

@@ -126,21 +126,30 @@ void LocalBranching_TwoYearCallback::IntegerCutCallback(const IloCplex::Callback
 		} //End of switch statement
 	}
 
+	//To branch whenever a new solution is found, comment out the first block and
+	//uncomment the second block
+	//////////////////////////////////////////////////////////////
 
-	//if (obj_tilde > BranchingObjective + EPS) {
-	//	BranchingSolution = x_tilde;
-	//	BranchingObjective = obj_tilde;
-	//	BranchingDistance = k_tilde;
-	//	BranchingFlag = true;
-	//}
-
-	if ((!BranchingFlag) || (obj_tilde > BranchingObjective + EPS)){
+	//Branch only when the incumbent is updated
+	if (obj_tilde > BranchingObjective + EPS) {
 		BranchingSolution = x_tilde;
 		BranchingObjective = obj_tilde;
 		BranchingDistance = k_tilde;
 		BranchingFlag = true;
 	}
 
+	//////////////////////////////////////////////////////////////
+
+	/////Branch anytime a new solution is found
+	//if ((!BranchingFlag) || (obj_tilde > BranchingObjective + EPS)){
+	//	BranchingSolution = x_tilde;
+	//	BranchingObjective = obj_tilde;
+	//	BranchingDistance = k_tilde;
+	//	BranchingFlag = true;
+	//}
+
+	//////////////////////////////////////////////////////////////
+	//end of blocks for branching
 }
 
 void LocalBranching_TwoYearCallback::AddBendersCuts(const IloCplex::Callback::Context& context, const ArrayXXd& x_tilde)
@@ -148,37 +157,24 @@ void LocalBranching_TwoYearCallback::AddBendersCuts(const IloCplex::Callback::Co
 	IloEnv env = context.getEnv();
 	vector<VectorXd> I_tilde = CalculateItilde(x_tilde);
 
-	////Multi-cut (by year), B1
-	//for (int t = 0; t < T; t++) {
-	//	IloExpr lhs(env);
-	//	lhs -= theta[t];
-	//	double covered = (I_tilde[t].array() >= 1).matrix().cast<double>().dot(data.weights[t]);
-	//	VectorXd uncovered = (I_tilde[t].array() < 1).matrix().cast<double>();
-	//	for (int j_bar = 0; j_bar < M_bar; j_bar++) {
-	//		lhs += (data.CutCoeffs[t].col(j_bar).dot(uncovered)) * x[t][j_bar];
-	//	}
-
-	//	switch (context.getId()) {
-	//	case (IloCplex::Callback::Context::Id::Candidate):
-	//		if (context.getCandidateValue(lhs) < -covered -EPS) {
-	//			context.rejectCandidate(lhs >= -covered);
-	//		}
-	//		lhs.end();
-	//		break;
-	//	case (IloCplex::Callback::Context::Id::Relaxation):
-	//		if (context.getRelaxationValue(lhs) < -covered -EPS) {
-	//			//context.addUserCut(lhs >= 0, IloCplex::UseCutForce, IloFalse).end();
-	//			context.addUserCut(lhs >= -covered, IloCplex::UseCutPurge, IloFalse);
-	//		}
-	//		lhs.end();
-	//		break;
-	//	}
-	//}
-
-
-
-	//Multi-cut (by year), Multi1PO1
+	
 	for (int t = 0; t < T; t++) {
+
+		//To use non-Pareto-optimal B1 cuts, uncomment the first block and comment out the second block
+		//////////////////////////////////////////////////////////////
+
+		////Multi-cut (by year), B1
+		//	IloExpr lhs(env);
+		//	lhs -= theta[t];
+		//	double covered = (I_tilde[t].array() >= 1).matrix().cast<double>().dot(data.weights[t]);
+		//	VectorXd uncovered = (I_tilde[t].array() < 1).matrix().cast<double>();
+		//	for (int j_bar = 0; j_bar < M_bar; j_bar++) {
+		//		lhs += (data.CutCoeffs[t].col(j_bar).dot(uncovered)) * x[t][j_bar];
+		//	}
+
+		//////////////////////////////////////////////////////////////
+
+		//Multi-cut (by year), Pareto-optimal B1
 		IloExpr lhs(env);
 		lhs -= theta[t];
 		double covered = ((I_tilde[t].array() > 1) || ((I_tilde[t].array() == 1) && (core_coverage[t].array() >= 1))).matrix().cast<double>().dot(data.weights[t]);
@@ -187,6 +183,9 @@ void LocalBranching_TwoYearCallback::AddBendersCuts(const IloCplex::Callback::Co
 		for (int j_bar = 0; j_bar < M_bar; j_bar++) {
 			lhs += (data.CutCoeffs[t].col(j_bar).dot(uncovered)) * x[t][j_bar];
 		}
+
+		//////////////////////////////////////////////////////////////
+		//end of blocks for cut type
 
 		switch (context.getId()) {
 		case (IloCplex::Callback::Context::Id::Candidate):
@@ -200,7 +199,6 @@ void LocalBranching_TwoYearCallback::AddBendersCuts(const IloCplex::Callback::Co
 		case (IloCplex::Callback::Context::Id::Relaxation):
 		{
 			if (context.getRelaxationValue(lhs) < -covered - EPS) {
-				//context.addUserCut(lhs >= -covered, IloCplex::UseCutForce, IloFalse);
 				context.addUserCut(lhs >= -covered, IloCplex::UseCutPurge, IloFalse);
 			}
 			lhs.end();
