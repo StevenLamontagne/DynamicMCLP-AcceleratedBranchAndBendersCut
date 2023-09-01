@@ -1,0 +1,10 @@
+# DynamicMCLP-AcceleratedBranchAndBendersCut
+Implementation of greedy, branch-and-cut, unaccelerated and accelerated branch-and-Benders-cut, and accelerated branch-and-Benders-cut for the dynamic maximum covering location problem (MCLP). Branch-and-cut, as well as all three Benders-related methods, use CPLEX optimisation software. Notably, the Benders methods are implemented as [generic callbacks](https://www.ibm.com/docs/en/icos/22.1.1?topic=c-ilocplexcallback-1) within the C++ interface of CPLEX version 22.1.1.
+
+The paper detailing the algorithms is available on [arXiv](<add link here once available>).
+The instances used in this paper originate from [Lamontagne 2023](https://pubsonline.informs.org/doi/10.1287/ijoc.2022.0185), and the instances are available from [Edinburgh DataShare](https://datashare.ed.ac.uk/handle/10283/4856). For running the methods in a given dataset (e.g. "Simple" dataset), you will need an instance file (e.g. `Simple/MC_0_compressed.json` ) and the corresponding shared file (e.g. `Simple/Shared.json`). Sample code for loading the data and solving the model is provided in `main.cpp`.
+
+The code relies on the following packages and compiled binary files:
+- All CPLEX-related compiled libraries (this includes `cplex2210.lib`, `ilocplex.lib`, and `concert.lib`), which are necessary for using CPLEX. Linking instructions are provided by IBM, and are typically placed in the same folder as the CPLEX optimisation software. The code was created and tested using CPLEX version 22.1.1, and the corresponding versions of the library files. 
+- The [nlohmann JSON package](https://github.com/nlohmann/json) is used to load the data files and to store results, via the [`json.hpp`](https://github.com/nlohmann/json#integration) header-only file. The code was created and tested using version 3.10.5 of the header-only file. 
+- The [Eigen library](https://eigen.tuxfamily.org/index.php?title=Main_Page) is used for dense and sparse matrix calculations, for which download information can be found at the top-right of the page. The code was created and tested using version 3.4 of the library. 
